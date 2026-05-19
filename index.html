@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Studie — AI Study Assistant</title>
+  <meta name="description" content="AI-powered study app to help you ace your exams with personalised quizzes, daily activities, and smart study tips." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Sidebar -->
+  <nav id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <span class="logo-text">Studie</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <span class="sidebar-label">Overview</span>
+      <button class="nav-btn active" data-page="dashboard" id="nav-dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-btn" data-page="calendar" id="nav-calendar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Exam Calendar
+      </button>
+      <button class="nav-btn" data-page="daily" id="nav-daily">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Daily Activity
+      </button>
+      <button class="nav-btn" data-page="ai-chat" id="nav-ai-chat">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        AI Tutor
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <span class="sidebar-label">Subjects</span>
+      <button class="nav-btn subject-btn" data-page="subject" data-subject="maths" id="nav-maths">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/></svg>
+        Maths
+      </button>
+      <button class="nav-btn subject-btn" data-page="subject" data-subject="science" id="nav-science">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11m0 0H5a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4m0-6h4m4 0h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-4m6-6V3"/></svg>
+        Science
+        <span class="priority-badge">Priority</span>
+      </button>
+      <button class="nav-btn subject-btn" data-page="subject" data-subject="systems technology" id="nav-systems-technology">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        Systems Tech
+        <span class="priority-badge">Priority</span>
+      </button>
+      <button class="nav-btn subject-btn" data-page="subject" data-subject="english" id="nav-english">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+        English
+        <span class="priority-badge">Priority</span>
+      </button>
+      <button class="nav-btn subject-btn" data-page="subject" data-subject="history" id="nav-history">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        History
+      </button>
+      <button class="nav-btn subject-btn" data-page="subject" data-subject="media studies" id="nav-media-studies">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Media Studies
+      </button>
+    </div>
+
+    <div class="sidebar-section">
+      <span class="sidebar-label">Data & Settings</span>
+      <button class="nav-btn" id="export-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export Data
+      </button>
+      <button class="nav-btn" id="import-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import Data
+      </button>
+      <input type="file" id="import-file-input" accept=".json" style="display:none" />
+      <button class="nav-btn" data-page="settings" id="nav-settings">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        Settings
+      </button>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main-content">
+
+    <!-- Dashboard Page -->
+    <div id="page-dashboard" class="page active">
+      <div class="page-header">
+        <div>
+          <h1 id="greeting-text">Good evening! 👋</h1>
+          <p class="page-subtitle">Here's your study overview for today.</p>
+        </div>
+        <div class="streak-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span id="streak-count">0</span> day streak
+        </div>
+      </div>
+
+      <div class="cards-grid" id="dashboard-grid">
+        <!-- Priority Alert -->
+        <div class="card priority-card full-width">
+          <div class="card-icon priority-icon">🎯</div>
+          <div class="card-content">
+            <h3>Today's Focus</h3>
+            <p id="focus-text">You haven't set your focus subjects yet. Head to Settings to update them!</p>
+            <div class="priority-subjects" id="focus-badges">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Daily Activity Card -->
+        <div class="card clickable" id="dash-daily-card">
+          <div class="card-header-row">
+            <div class="card-icon">⏱️</div>
+            <span class="card-tag">5 min</span>
+          </div>
+          <h3>Daily Activity</h3>
+          <p>Complete your daily 5-minute study challenge</p>
+          <div id="daily-progress-bar-container" class="progress-container">
+            <div class="progress-bar" id="daily-progress-bar" style="width: 0%"></div>
+          </div>
+          <span id="daily-progress-label" class="progress-label">0 / 1 completed today</span>
+        </div>
+
+        <!-- Upcoming Exams -->
+        <div class="card">
+          <div class="card-header-row">
+            <div class="card-icon">📅</div>
+          </div>
+          <h3>Upcoming Exams</h3>
+          <div id="upcoming-exams-list" class="upcoming-list">
+            <p class="empty-state">No upcoming exams. Add some in the Exam Calendar!</p>
+          </div>
+        </div>
+
+        <!-- AI Tip -->
+        <div class="card ai-tip-card">
+          <div class="card-header-row">
+            <div class="card-icon">🤖</div>
+            <span class="card-tag">AI Tip</span>
+          </div>
+          <h3>Study Tip of the Day</h3>
+          <p id="study-tip-text">Loading your personalised tip...</p>
+          <button class="btn btn-ghost btn-sm" id="refresh-tip-btn">New Tip</button>
+        </div>
+
+        <!-- Quiz Card -->
+        <div class="card clickable" id="dash-quiz-card">
+          <div class="card-icon">🧠</div>
+          <h3>Quick Quiz</h3>
+          <p>Test your knowledge with an AI-generated quiz on any topic</p>
+          <button class="btn btn-primary btn-sm">Start Quiz →</button>
+        </div>
+
+        <!-- Progress Overview -->
+        <div class="card">
+          <div class="card-icon">📊</div>
+          <h3>Subject Progress</h3>
+          <div id="subject-progress-list" class="subject-progress-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Calendar Page -->
+    <div id="page-calendar" class="page">
+      <div class="page-header">
+        <div>
+          <h1>Exam Calendar</h1>
+          <p class="page-subtitle">Track your upcoming tests and exams</p>
+        </div>
+        <button class="btn btn-primary" id="add-exam-btn">+ Add Exam</button>
+      </div>
+
+      <div class="calendar-layout">
+        <div class="calendar-widget">
+          <div class="cal-nav">
+            <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
+            <span id="cal-month-label" class="cal-month-label">May 2026</span>
+            <button class="cal-nav-btn" id="cal-next">&#8250;</button>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-day-header">Sun</div>
+            <div class="cal-day-header">Mon</div>
+            <div class="cal-day-header">Tue</div>
+            <div class="cal-day-header">Wed</div>
+            <div class="cal-day-header">Thu</div>
+            <div class="cal-day-header">Fri</div>
+            <div class="cal-day-header">Sat</div>
+          </div>
+          <div id="cal-days" class="cal-grid cal-days"></div>
+        </div>
+
+        <div class="exams-panel">
+          <h3>All Exams</h3>
+          <div id="exams-list" class="exams-list">
+            <p class="empty-state">No exams added yet. Click "+ Add Exam" to get started.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Exam Modal -->
+      <div id="exam-modal" class="modal-overlay hidden">
+        <div class="modal">
+          <div class="modal-header">
+            <h3 id="exam-modal-title">Add Exam</h3>
+            <button class="modal-close" id="exam-modal-close">✕</button>
+          </div>
+          <div class="modal-body">
+            <div class="form-group">
+              <label for="exam-name">Exam / Test Name</label>
+              <input type="text" id="exam-name" placeholder="e.g. Science Chapter 3 Test" />
+            </div>
+            <div class="form-group">
+              <label for="exam-subject">Subject</label>
+              <select id="exam-subject">
+                <option value="Maths">Maths</option>
+                <option value="Science">Science</option>
+                <option value="Systems Technology">Systems Technology</option>
+                <option value="English">English</option>
+                <option value="History">History</option>
+                <option value="Media Studies">Media Studies</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="exam-date">Date</label>
+              <input type="date" id="exam-date" />
+            </div>
+            <div class="form-group">
+              <label for="exam-notes">Notes (optional)</label>
+              <textarea id="exam-notes" placeholder="Topics to cover, important notes..." rows="3"></textarea>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-ghost" id="exam-modal-cancel">Cancel</button>
+            <button class="btn btn-primary" id="exam-modal-save">Save Exam</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Daily Activity Page -->
+    <div id="page-daily" class="page">
+      <div class="page-header">
+        <div>
+          <h1>Daily Activity</h1>
+          <p class="page-subtitle">Complete today's 5-minute study challenge</p>
+        </div>
+        <div class="streak-badge">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+          <span id="streak-count-2">0</span> day streak
+        </div>
+      </div>
+
+      <div id="daily-activity-container">
+        <div class="card full-width" id="daily-activity-card">
+          <div class="daily-activity-header">
+            <div class="daily-activity-icon">⚡</div>
+            <div>
+              <h2 id="daily-activity-title">Loading today's activity...</h2>
+              <p id="daily-activity-subject" class="chip chip-blue" style="display:inline-block">Subject</p>
+            </div>
+            <div class="daily-timer" id="daily-timer-display">5:00</div>
+          </div>
+          <div id="daily-activity-content" class="daily-content"></div>
+          <div class="daily-controls">
+            <button class="btn btn-primary" id="start-daily-btn">Start Activity</button>
+            <button class="btn btn-ghost hidden" id="daily-next-btn">Next →</button>
+            <button class="btn btn-success hidden" id="daily-complete-btn">✓ Mark Complete</button>
+          </div>
+        </div>
+
+        <div class="card" id="daily-history-card">
+          <h3>Recent Activities</h3>
+          <div id="daily-history-list" class="history-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI Chat Page -->
+    <div id="page-ai-chat" class="page">
+      <div class="page-header">
+        <div>
+          <h1>AI Tutor</h1>
+          <p class="page-subtitle">Ask anything about your subjects</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="clear-chat-btn">Clear Chat</button>
+      </div>
+
+      <div class="chat-layout">
+        <div class="chat-container" id="chat-container">
+          <div class="chat-welcome">
+            <div class="ai-avatar">🤖</div>
+            <h3>Hi! I'm your Studie AI Tutor</h3>
+            <p>Ask me anything about Maths, Science, Systems Technology, English, History, or Media Studies. I can also generate quizzes, explain concepts, or help you prepare for exams!</p>
+            <div class="quick-prompts">
+              <button class="quick-prompt-btn" data-prompt="Give me a quiz on Science DNA">🧬 Quiz on DNA</button>
+              <button class="quick-prompt-btn" data-prompt="Explain how Macbeth's ambition leads to his downfall">📖 Macbeth Summary</button>
+              <button class="quick-prompt-btn" data-prompt="Explain Ohm's Law with examples">⚡ Ohm's Law</button>
+              <button class="quick-prompt-btn" data-prompt="What are key essay writing techniques?">✍️ Essay Tips</button>
+              <button class="quick-prompt-btn" data-prompt="Create a quiz on World War 2 key events">🌍 WW2 Quiz</button>
+              <button class="quick-prompt-btn" data-prompt="Explain camera techniques used in Misery film">🎬 Film Techniques</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <div class="chat-subject-select">
+            <label>Context:</label>
+            <select id="chat-subject-select">
+              <option value="General">General</option>
+              <option value="Maths">Maths</option>
+              <option value="Science">Science</option>
+              <option value="Systems Technology">Systems Technology</option>
+              <option value="English">English</option>
+              <option value="History">History</option>
+              <option value="Media Studies">Media Studies</option>
+            </select>
+          </div>
+          <div class="chat-input-row">
+            <textarea id="chat-input" placeholder="Ask your AI tutor anything..." rows="1"></textarea>
+            <button class="chat-send-btn" id="chat-send-btn">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subject Page (dynamic) -->
+    <div id="page-subject" class="page">
+      <div id="subject-page-content"></div>
+    </div>
+
+    <!-- Settings Page -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <div>
+          <h1>Settings</h1>
+          <p class="page-subtitle">Configure your Studie experience</p>
+        </div>
+      </div>
+
+      <div class="cards-grid">
+        <div class="card full-width">
+          <h3>AI Configuration</h3>
+          <div class="form-group">
+            <label for="settings-api-key">Gemini API Key</label>
+            <input type="password" id="settings-api-key" placeholder="Enter your API key" />
+            <small class="quiz-progress-text">Stored securely in your browser's local storage.</small>
+          </div>
+          <div class="form-group">
+            <label for="settings-ai-model">AI Model Selection</label>
+            <select id="settings-ai-model">
+              <option value="gemini-3.1-flash-lite-preview">gemini-3.1-flash-lite-preview (auto)</option>
+              <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
+              <option value="gemma-4-26b-a4b-it">gemma-4-26b-a4b-it</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card full-width">
+          <h3>Study Preferences</h3>
+          <div class="form-group">
+            <label>Select Your Focus Subjects</label>
+            <div class="priority-subjects" style="gap: 12px;" id="settings-focus-list">
+              <label><input type="checkbox" value="Maths"> Maths</label>
+              <label><input type="checkbox" value="Science"> Science</label>
+              <label><input type="checkbox" value="Systems Technology"> Systems Technology</label>
+              <label><input type="checkbox" value="English"> English</label>
+              <label><input type="checkbox" value="History"> History</label>
+              <label><input type="checkbox" value="Media Studies"> Media Studies</label>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="save-settings-btn" style="margin-top: 10px;">Save Settings</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Quiz Modal -->
+  <div id="quiz-modal" class="modal-overlay hidden">
+    <div class="modal modal-large">
+      <div class="modal-header">
+        <h3 id="quiz-modal-title">Quiz</h3>
+        <button class="modal-close" id="quiz-modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="quiz-modal-body">
+        <div class="quiz-loading">
+          <div class="spinner"></div>
+          <p>Generating your quiz...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
