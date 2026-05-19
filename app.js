@@ -1,6 +1,6 @@
 // State
 const defaultState = {
-  apiKey: 'AIzaSyDvOh4IQ1Hn36MOiHB8de_62QJ35DDguJg',
+  apiKey: '',
   aiModel: 'gemini-3.1-flash-lite-preview',
   focusSubjects: ['Science', 'Systems Technology', 'English'],
   exams: [],
@@ -11,7 +11,8 @@ const defaultState = {
     'Maths': 0, 'Science': 0, 'Systems Technology': 0,
     'English': 0, 'History': 0, 'Media Studies': 0
   },
-  chatHistory: []
+  chatHistory: [],
+  dailyQuiz: null
 };
 
 const savedState = JSON.parse(localStorage.getItem('studie_state'));
@@ -108,6 +109,7 @@ function updateStreak() {
     }
     state.lastActive = today;
     state.dailyCompleted = false; // Reset daily activity
+    state.dailyQuiz = null; // Reset daily quiz
     saveState();
   }
   updateStreakDisplay();
@@ -149,10 +151,14 @@ function renderDashboard() {
   const pl = document.getElementById('daily-progress-label');
   if (state.dailyCompleted) {
     pb.style.width = '100%';
-    pl.textContent = '1 / 1 completed today';
+    pl.textContent = 'Completed today';
+  } else if (state.dailyQuiz) {
+    const pct = Math.round((state.dailyQuiz.currentQ / state.dailyQuiz.questions.length) * 100);
+    pb.style.width = `${pct}%`;
+    pl.textContent = `${state.dailyQuiz.currentQ} / ${state.dailyQuiz.questions.length} questions completed`;
   } else {
     pb.style.width = '0%';
-    pl.textContent = '0 / 1 completed today';
+    pl.textContent = '0 questions completed';
   }
 
   // Upcoming Exams
@@ -713,72 +719,118 @@ function setupEventListeners() {
 function setupDailyActivity() {
   if (state.dailyCompleted) {
     document.getElementById('daily-activity-title').textContent = "Daily Activity Complete! 🎉";
-    document.getElementById('daily-activity-content').innerHTML = "<p>Great job! You've finished your 5-minute study activity for today. Come back tomorrow to keep your streak going.</p>";
+    document.getElementById('daily-activity-subject').style.display = 'none';
+    document.getElementById('daily-timer-display').style.display = 'none';
+    document.getElementById('daily-activity-content').innerHTML = "<p>Great job! You've finished your daily quiz for today. Come back tomorrow to keep your streak going.</p>";
     document.getElementById('start-daily-btn').classList.add('hidden');
-    document.getElementById('daily-complete-btn').classList.add('hidden');
+    document.getElementById('daily-complete-btn')?.classList.add('hidden');
+    document.getElementById('daily-next-btn')?.classList.add('hidden');
     return;
   }
   
-  const subjects = Object.keys(subjectData);
-  const randomSub = subjects[Math.floor(Math.random() * subjects.length)];
-  const topics = subjectData[randomSub];
-  const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+  document.getElementById('daily-activity-subject').style.display = 'inline-block';
+  document.getElementById('daily-activity-subject').textContent = 'Daily Quiz';
+  document.getElementById('daily-timer-display').style.display = 'none';
   
-  document.getElementById('daily-activity-title').textContent = "Quick Flashcard Review";
-  document.getElementById('daily-activity-subject').textContent = randomSub;
-  document.getElementById('daily-activity-content').innerHTML = `
-    <p>Take 5 minutes to review the core concepts of <strong>${randomTopic}</strong>.</p>
-    <ul style="margin-top: 10px; margin-left: 20px; line-height: 1.8;">
-      <li>Write down 3 main points about this topic.</li>
-      <li>Explain the topic out loud as if teaching it to someone else.</li>
-      <li>Think of one real-world application of this concept.</li>
-    </ul>
-    <p style="margin-top: 15px;">When you're ready, click 'Start Activity' and the 5 minute timer will begin!</p>
-  `;
-  
-  const startBtn = document.getElementById('start-daily-btn');
-  const completeBtn = document.getElementById('daily-complete-btn');
-  const timerDisplay = document.getElementById('daily-timer-display');
-  
-  startBtn.classList.remove('hidden');
-  completeBtn.classList.add('hidden');
-  timerDisplay.textContent = "5:00";
-  
-  // Clear any existing listeners
-  const newStartBtn = startBtn.cloneNode(true);
-  startBtn.parentNode.replaceChild(newStartBtn, startBtn);
-  
-  newStartBtn.addEventListener('click', () => {
-    newStartBtn.classList.add('hidden');
-    completeBtn.classList.remove('hidden');
+  if (!state.dailyQuiz) {
+    document.getElementById('daily-activity-title').textContent = "Daily Long Quiz";
+    document.getElementById('daily-activity-content').innerHTML = `
+      <p style="margin-bottom: 15px;">Complete your comprehensive daily quiz. This quiz contains multiple questions across all topics, with extra focus on your priority subjects. You can complete it throughout the day.</p>
+    `;
+    const startBtn = document.getElementById('start-daily-btn');
+    startBtn.classList.remove('hidden');
+    startBtn.textContent = "Generate & Start Quiz";
     
-    let timeLeft = 300;
-    const timer = setInterval(() => {
-      timeLeft--;
-      const m = Math.floor(timeLeft / 60);
-      const s = timeLeft % 60;
-      timerDisplay.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+    const newStartBtn = startBtn.cloneNode(true);
+    startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+    
+    newStartBtn.addEventListener('click', async () => {
+      newStartBtn.disabled = true;
+      newStartBtn.textContent = "Generating...";
       
-      if (timeLeft <= 0) {
-        clearInterval(timer);
-        timerDisplay.textContent = "0:00";
+      const safeFocus = Array.isArray(state.focusSubjects) ? state.focusSubjects.join(', ') : 'None';
+      const prompt = `Create a 20 question multiple choice quiz covering a variety of topics from different subjects. Prioritize topics from the following subjects: ${safeFocus}. Include questions from Maths, Science, Systems Technology, English, History, Media Studies. Return ONLY a JSON array of objects, where each object has: "question" (string), "options" (array of 4 strings), "answer" (index of correct option 0-3), "explanation" (string explaining the answer). NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
+      
+      const result = await callGemini(prompt);
+      try {
+        let raw = result.trim();
+        if(raw.startsWith('```json')) raw = raw.slice(7, -3);
+        if(raw.startsWith('```')) raw = raw.slice(3, -3);
+        const questions = JSON.parse(raw);
+        state.dailyQuiz = { questions, currentQ: 0, score: 0 };
+        saveState();
+        renderDailyQuiz();
+      } catch(e) {
+        newStartBtn.disabled = false;
+        newStartBtn.textContent = "Try Again";
+        showToast("Error generating quiz", "error");
       }
-    }, 1000);
-    
-    // Complete activity setup
-    const newCompleteBtn = completeBtn.cloneNode(true);
-    completeBtn.parentNode.replaceChild(newCompleteBtn, completeBtn);
-    
-    newCompleteBtn.addEventListener('click', () => {
-      clearInterval(timer);
-      if (!state.dailyCompleted) {
-        state.streak += 1;
-      }
+    });
+  } else {
+    renderDailyQuiz();
+  }
+}
+
+function renderDailyQuiz() {
+  const startBtn = document.getElementById('start-daily-btn');
+  startBtn.classList.add('hidden');
+  
+  const qData = state.dailyQuiz;
+  if(qData.currentQ >= qData.questions.length) {
+    if (!state.dailyCompleted) {
+      state.streak += 1;
       state.dailyCompleted = true;
       saveState();
       updateStreakDisplay();
       showToast("Daily Activity Completed!", "success");
-      setupDailyActivity();
+    }
+    setupDailyActivity();
+    renderDashboard();
+    return;
+  }
+  
+  document.getElementById('daily-activity-title').textContent = `Question ${qData.currentQ + 1} of ${qData.questions.length}`;
+  const q = qData.questions[qData.currentQ];
+  
+  document.getElementById('daily-activity-content').innerHTML = `
+    <div class="quiz-question" style="margin-top: 15px;">
+      <h4>${q.question}</h4>
+      <div class="quiz-options">
+        ${q.options.map((opt, i) => `<button class="quiz-option daily-opt" data-idx="${i}">${opt}</button>`).join('')}
+      </div>
+      <div id="daily-feedback-area"></div>
+      <p style="font-size: 12px; color: var(--text2); text-align: center; margin-top: 20px;">Your progress is automatically saved. You can safely close the app and return later.</p>
+    </div>
+  `;
+  
+  document.querySelectorAll('.daily-opt').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      if(btn.disabled) return;
+      document.querySelectorAll('.daily-opt').forEach(b => b.disabled = true);
+      const selected = parseInt(e.target.getAttribute('data-idx'));
+      if(selected === q.answer) {
+        e.target.classList.add('correct');
+        state.dailyQuiz.score++;
+        document.getElementById('daily-feedback-area').innerHTML = `
+          <div class="quiz-feedback correct">Correct! ${q.explanation}</div>
+          <button class="btn btn-primary" id="daily-next-q-btn" style="margin-top: 10px">Next</button>
+        `;
+      } else {
+        e.target.classList.add('wrong');
+        document.querySelectorAll('.daily-opt')[q.answer].classList.add('correct');
+        document.getElementById('daily-feedback-area').innerHTML = `
+          <div class="quiz-feedback wrong">Incorrect. ${q.explanation}</div>
+          <button class="btn btn-primary" id="daily-next-q-btn" style="margin-top: 10px">Next</button>
+        `;
+      }
+      saveState();
+      
+      document.getElementById('daily-next-q-btn').addEventListener('click', () => {
+        state.dailyQuiz.currentQ++;
+        saveState();
+        renderDashboard();
+        renderDailyQuiz();
+      });
     });
   });
 }
