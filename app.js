@@ -12,7 +12,8 @@ const defaultState = {
     'English': 0, 'History': 0, 'Media Studies': 0
   },
   chatHistory: [],
-  dailyQuiz: null
+  dailyQuiz: null,
+  studyNotes: {}
 };
 
 const savedState = JSON.parse(localStorage.getItem('studie_state'));
@@ -20,6 +21,7 @@ let state = savedState ? { ...defaultState, ...savedState } : { ...defaultState 
 // Ensure arrays/objects are properly populated if missing
 if (!state.focusSubjects) state.focusSubjects = [...defaultState.focusSubjects];
 if (!state.subjectProgress) state.subjectProgress = { ...defaultState.subjectProgress };
+if (!state.studyNotes) state.studyNotes = {};
 
 // Hardcoded topics based on prompt
 const subjectData = {
@@ -210,14 +212,39 @@ function setRandomStudyTip() {
 
 document.getElementById('refresh-tip-btn').addEventListener('click', setRandomStudyTip);
 
-// Calendar (Simplified)
+// Calendar
+let currentCalMonth = new Date().getMonth();
+let currentCalYear = new Date().getFullYear();
+let selectedDate = null;
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  currentCalMonth--;
+  if(currentCalMonth < 0) { currentCalMonth = 11; currentCalYear--; }
+  renderCalendar();
+});
+
+document.getElementById('cal-next').addEventListener('click', () => {
+  currentCalMonth++;
+  if(currentCalMonth > 11) { currentCalMonth = 0; currentCalYear++; }
+  renderCalendar();
+});
+
 function renderCalendar() {
   // 1. Render Exam List
   const list = document.getElementById('exams-list');
-  const sorted = [...state.exams].sort((a,b) => new Date(a.date) - new Date(b.date));
+  let examsToShow = [...state.exams].sort((a,b) => new Date(a.date) - new Date(b.date));
   
-  if (sorted.length > 0) {
-    list.innerHTML = sorted.map(exam => `
+  if (selectedDate) {
+    examsToShow = examsToShow.filter(e => e.date === selectedDate);
+    const dObj = new Date(selectedDate);
+    document.querySelector('.exams-panel h3').innerHTML = `Exams on ${dObj.toLocaleDateString()} <button class="btn btn-ghost btn-sm" id="clear-date-selection-btn" style="float: right; font-size: 10px; padding: 4px 8px;">View All</button>`;
+    document.getElementById('clear-date-selection-btn').onclick = () => { selectedDate = null; renderCalendar(); };
+  } else {
+    document.querySelector('.exams-panel h3').innerHTML = 'All Exams';
+  }
+  
+  if (examsToShow.length > 0) {
+    list.innerHTML = examsToShow.map(exam => `
       <div class="exam-card">
         <span class="exam-card-name">${exam.name}</span>
         <div class="exam-card-meta">
@@ -226,24 +253,25 @@ function renderCalendar() {
         </div>
         ${exam.notes ? `<p class="exam-card-notes">${exam.notes}</p>` : ''}
         <div class="exam-card-actions">
+          <button class="exam-delete-btn" onclick="editExam('${exam.id}')">Edit</button>
           <button class="exam-delete-btn" onclick="deleteExam('${exam.id}')">Delete</button>
         </div>
       </div>
     `).join('');
   } else {
-    list.innerHTML = '<p class="empty-state">No exams added yet.</p>';
+    list.innerHTML = selectedDate ? '<p class="empty-state">No exams on this date.</p>' : '<p class="empty-state">No exams added yet.</p>';
   }
 
   // 2. Render Calendar Grid
   const calDays = document.getElementById('cal-days');
   const now = new Date();
-  const month = now.getMonth();
-  const year = now.getFullYear();
+  const todayString = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
   
-  document.getElementById('cal-month-label').textContent = now.toLocaleDateString('default', { month: 'long', year: 'numeric' });
+  const d = new Date(currentCalYear, currentCalMonth);
+  document.getElementById('cal-month-label').textContent = d.toLocaleDateString('default', { month: 'long', year: 'numeric' });
   
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(currentCalYear, currentCalMonth, 1).getDay();
+  const daysInMonth = new Date(currentCalYear, currentCalMonth + 1, 0).getDate();
   
   let gridHTML = '';
   // Empty slots
@@ -253,18 +281,47 @@ function renderCalendar() {
   
   // Day slots
   for(let i=1; i<=daysInMonth; i++) {
-    const isToday = (i === now.getDate());
-    const dateString = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+    const dateString = `${currentCalYear}-${String(currentCalMonth+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
     const hasExam = state.exams.some(e => e.date === dateString);
+    const isToday = (dateString === todayString);
+    const isSelected = (dateString === selectedDate);
     
-    gridHTML += `<div class="cal-day ${isToday ? 'today' : ''} ${hasExam ? 'has-exam' : ''}">${i}</div>`;
+    gridHTML += `<div class="cal-day ${isToday ? 'today' : ''} ${hasExam ? 'has-exam' : ''} ${isSelected ? 'selected' : ''}" data-date="${dateString}">${i}</div>`;
   }
   calDays.innerHTML = gridHTML;
+  
+  document.querySelectorAll('.cal-day:not(.empty)').forEach(dayEl => {
+    dayEl.addEventListener('click', () => {
+      const dateVal = dayEl.getAttribute('data-date');
+      selectedDate = (selectedDate === dateVal) ? null : dateVal;
+      renderCalendar();
+    });
+  });
 }
 
+let editingExamId = null;
+
 document.getElementById('add-exam-btn').addEventListener('click', () => {
+  editingExamId = null;
+  document.getElementById('exam-modal-title').textContent = 'Add Exam';
+  document.getElementById('exam-name').value = '';
+  document.getElementById('exam-subject').value = 'Maths';
+  document.getElementById('exam-date').value = '';
+  document.getElementById('exam-notes').value = '';
   document.getElementById('exam-modal').classList.remove('hidden');
 });
+
+window.editExam = (id) => {
+  const exam = state.exams.find(e => e.id === id);
+  if(!exam) return;
+  editingExamId = id;
+  document.getElementById('exam-modal-title').textContent = 'Edit Exam';
+  document.getElementById('exam-name').value = exam.name;
+  document.getElementById('exam-subject').value = exam.subject;
+  document.getElementById('exam-date').value = exam.date;
+  document.getElementById('exam-notes').value = exam.notes || '';
+  document.getElementById('exam-modal').classList.remove('hidden');
+};
 
 document.getElementById('exam-modal-close').addEventListener('click', () => {
   document.getElementById('exam-modal').classList.add('hidden');
@@ -284,14 +341,22 @@ document.getElementById('exam-modal-save').addEventListener('click', () => {
     return;
   }
 
-  state.exams.push({
-    id: Date.now().toString(),
-    name, subject, date, notes
-  });
+  if (editingExamId) {
+    const idx = state.exams.findIndex(e => e.id === editingExamId);
+    if(idx !== -1) {
+      state.exams[idx] = { id: editingExamId, name, subject, date, notes };
+    }
+  } else {
+    state.exams.push({
+      id: Date.now().toString(),
+      name, subject, date, notes
+    });
+  }
+  
   saveState();
   renderCalendar();
   document.getElementById('exam-modal').classList.add('hidden');
-  showToast('Exam added!', 'success');
+  showToast(editingExamId ? 'Exam updated!' : 'Exam added!', 'success');
 });
 
 window.deleteExam = (id) => {
@@ -499,6 +564,7 @@ function renderSubjectPage(subjectName) {
   };
   
   const topics = extendedTopics[realName] || subjectData[realName] || [];
+  const notesList = state.studyNotes[realName] || [];
   
   document.getElementById('subject-page-content').innerHTML = `
     <div class="page-header">
@@ -506,6 +572,24 @@ function renderSubjectPage(subjectName) {
         <h1>${realName}</h1>
         <p class="page-subtitle">Master these topics</p>
       </div>
+    </div>
+    
+    <div id="saved-notes-section" style="margin-bottom: 24px;">
+      <h3>Your Study Notes</h3>
+      ${notesList.length > 0 ? `
+        <div class="topics-grid" style="margin-top: 10px;">
+          ${notesList.map(n => `
+            <div class="topic-card" style="padding: 12px 16px;">
+              <h4 style="margin-bottom: 4px;">${n.topic}</h4>
+              <p style="font-size: 11px;">${new Date(n.id).toLocaleDateString()}</p>
+              <div class="topic-actions-row" style="margin-top: 8px;">
+                <button class="btn btn-primary btn-sm" onclick="viewSavedNote('${realName.replace(/'/g, "\\'")}', ${n.id})">View/Edit</button>
+                <button class="btn btn-ghost btn-sm" onclick="deleteSavedNote('${realName.replace(/'/g, "\\'")}', ${n.id})">Delete</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<p class="empty-state" style="text-align: left; padding: 10px 0;">No saved notes yet. Generate some below!</p>'}
     </div>
     
     <div class="card" style="margin-bottom: 24px;">
@@ -562,12 +646,72 @@ window.generateStudyNotes = async (subject, topic) => {
   const result = await callGemini(prompt);
   let cleaned = result.replace(/```html/g, '').replace(/```/g, '');
   
+  if (!state.studyNotes[subject]) state.studyNotes[subject] = [];
+  const newNoteId = Date.now();
+  state.studyNotes[subject].push({
+    id: newNoteId,
+    topic: topic,
+    content: cleaned
+  });
+  saveState();
+  
+  renderSubjectPage(subject);
+  viewSavedNote(subject, newNoteId);
+};
+
+window.viewSavedNote = (subject, noteId) => {
+  const note = state.studyNotes[subject].find(n => n.id === noteId);
+  if(!note) return;
+  const area = document.getElementById('subject-notes-area');
+  area.scrollIntoView({ behavior: 'smooth' });
+  
   area.innerHTML = `
     <div class="card" style="margin-top: 24px;">
-      <h3 style="margin-bottom: 16px; font-size: 18px;">Study Notes: ${topic}</h3>
-      <div style="line-height: 1.6; font-size: 14px; color: var(--text);">${cleaned}</div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px;">Study Notes: ${note.topic}</h3>
+        <div>
+          <button class="btn btn-ghost btn-sm" onclick="editSavedNote('${subject.replace(/'/g, "\\'")}', ${noteId})">Edit Notes</button>
+        </div>
+      </div>
+      <div style="line-height: 1.6; font-size: 14px; color: var(--text);">${note.content}</div>
     </div>
   `;
+};
+
+window.editSavedNote = (subject, noteId) => {
+  const note = state.studyNotes[subject].find(n => n.id === noteId);
+  if(!note) return;
+  const area = document.getElementById('subject-notes-area');
+  
+  area.innerHTML = `
+    <div class="card" style="margin-top: 24px;">
+      <h3 style="margin-bottom: 16px; font-size: 18px;">Edit Study Notes: ${note.topic}</h3>
+      <textarea id="edit-note-content" style="width: 100%; min-height: 300px; background: var(--bg3); border: 1px solid var(--border); color: var(--text); padding: 10px; border-radius: var(--radius-sm); font-family: inherit; font-size: 14px; resize: vertical; margin-bottom: 16px;">${note.content}</textarea>
+      <div style="display: flex; gap: 10px;">
+        <button class="btn btn-primary" onclick="saveEditedNote('${subject.replace(/'/g, "\\'")}', ${noteId})">Save</button>
+        <button class="btn btn-ghost" onclick="viewSavedNote('${subject.replace(/'/g, "\\'")}', ${noteId})">Cancel</button>
+      </div>
+    </div>
+  `;
+};
+
+window.saveEditedNote = (subject, noteId) => {
+  const content = document.getElementById('edit-note-content').value;
+  const note = state.studyNotes[subject].find(n => n.id === noteId);
+  if(note) {
+    note.content = content;
+    saveState();
+    viewSavedNote(subject, noteId);
+    showToast('Notes saved successfully', 'success');
+  }
+};
+
+window.deleteSavedNote = (subject, noteId) => {
+  state.studyNotes[subject] = state.studyNotes[subject].filter(n => n.id !== noteId);
+  saveState();
+  document.getElementById('subject-notes-area').innerHTML = '';
+  renderSubjectPage(subject);
+  showToast('Note deleted', 'success');
 };
 
 // Quiz Stub
