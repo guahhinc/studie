@@ -387,15 +387,18 @@ document.querySelectorAll('#settings-focus-list input[type="checkbox"]').forEach
   });
 });
 
-document.getElementById('save-settings-btn').addEventListener('click', () => {
-  state.apiKey = document.getElementById('settings-api-key').value;
-  state.aiModel = document.getElementById('settings-ai-model').value;
-  
-  const focusCheckboxes = document.querySelectorAll('#settings-focus-list input[type="checkbox"]:checked');
-  state.focusSubjects = Array.from(focusCheckboxes).map(cb => cb.value);
-  
+document.getElementById('settings-api-key').addEventListener('input', (e) => {
+  state.apiKey = e.target.value;
   saveState();
-  showToast('Settings saved successfully', 'success');
+});
+
+document.getElementById('settings-ai-model').addEventListener('change', (e) => {
+  state.aiModel = e.target.value;
+  saveState();
+});
+
+document.getElementById('update-app-btn').addEventListener('click', () => {
+  window.location.reload();
 });
 
 // Utilities
