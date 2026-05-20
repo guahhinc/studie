@@ -13,7 +13,9 @@ const defaultState = {
   },
   chatHistory: [],
   dailyQuiz: null,
-  studyNotes: {}
+  studyNotes: {},
+  completedCourses: {},
+  activeCourse: null
 };
 
 const savedState = JSON.parse(localStorage.getItem('studie_state'));
@@ -22,6 +24,72 @@ let state = savedState ? { ...defaultState, ...savedState } : { ...defaultState 
 if (!state.focusSubjects) state.focusSubjects = [...defaultState.focusSubjects];
 if (!state.subjectProgress) state.subjectProgress = { ...defaultState.subjectProgress };
 if (!state.studyNotes) state.studyNotes = {};
+if (!state.completedCourses) state.completedCourses = {};
+if (state.activeCourse === undefined) state.activeCourse = null;
+
+function renderMath(element) {
+  if (!element) return;
+  if (window.renderMathInElement) {
+    try {
+      window.renderMathInElement(element, {
+        delimiters: [
+          {left: '$$', right: '$$', display: true},
+          {left: '$', right: '$', display: false},
+          {left: '\\(', right: '\\)', display: false},
+          {left: '\\[', right: '\\]', display: true}
+        ],
+        throwOnError: false
+      });
+    } catch (e) {
+      console.warn("KaTeX error:", e);
+    }
+  } else {
+    setTimeout(() => renderMath(element), 200);
+  }
+}
+
+function getLevenshteinDistance(a, b) {
+  const matrix = [];
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        );
+      }
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+function checkSpelledAnswerClose(userInput, correctAnswer) {
+  const u = userInput.trim().toLowerCase();
+  const c = correctAnswer.trim().toLowerCase();
+  if (u === c) return { isCorrect: true, isExact: true };
+  
+  const dist = getLevenshteinDistance(u, c);
+  let maxAllowed = 0;
+  if (c.length >= 4 && c.length <= 6) {
+    maxAllowed = 1;
+  } else if (c.length >= 7) {
+    maxAllowed = 2;
+  }
+  
+  if (dist <= maxAllowed) {
+    return { isCorrect: true, isExact: false };
+  }
+  return { isCorrect: false, isExact: false };
+}
 
 // Hardcoded topics based on prompt
 const subjectData = {
@@ -31,6 +99,15 @@ const subjectData = {
   'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques'],
   'History': ['WW2', 'Holocaust', 'Essay'],
   'Media Studies': ['Essay', 'Misery (Film)', 'Film Techniques', 'Camera Techniques', 'Lighting']
+};
+
+const extendedTopics = {
+  'Maths': ['Finance', 'Algebra', 'Measurement', 'Graphing', 'Scatterplots', 'Geometry', 'Statistics', 'Probability', 'Calculus', 'Trigonometry'],
+  'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Biology', 'Physics', 'Ecosystems', 'Chemical Reactions'],
+  'Systems Technology': ['Wiring', 'Coding', 'Arduino', 'Circuit', 'Electricity', 'Robotics', 'Microcontrollers', 'Sensors', 'Logic Gates'],
+  'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques', 'Poetry Analysis', 'Creative Writing', 'Grammar', 'Textual Analysis'],
+  'History': ['WW2', 'Holocaust', 'Essay', 'Ancient Rome', 'Cold War', 'Industrial Revolution', 'Civil Rights Movement'],
+  'Media Studies': ['Essay', 'Misery (Film)', 'Film Techniques', 'Camera Techniques', 'Lighting', 'Sound Design', 'Editing', 'Mise-en-scene', 'Media Ethics']
 };
 
 const studyTips = [
@@ -87,6 +164,9 @@ function setupNavigation() {
       }
       if (pageId === 'settings') {
         renderSettings();
+      }
+      if (pageId === 'daily') {
+        setupDailyActivity();
       }
     });
   });
@@ -201,6 +281,25 @@ function renderDashboard() {
       <div class="progress-container"><div class="progress-bar" style="width: ${val}%"></div></div>
     </div>
   `).join('');
+
+  // Active Course Card
+  const activeCard = document.getElementById('dash-active-course-card');
+  if (activeCard) {
+    if (state.activeCourse && state.activeCourse.items && state.activeCourse.items.length > 0) {
+      activeCard.classList.remove('hidden');
+      document.getElementById('dash-active-course-title').textContent = `${state.activeCourse.topic} Course`;
+      document.getElementById('dash-active-course-desc').innerHTML = `Continue your course on <strong>${state.activeCourse.topic}</strong> (${state.activeCourse.subject})`;
+      
+      const currentStep = state.activeCourse.currentItem;
+      const totalSteps = state.activeCourse.items.length;
+      const pct = Math.round((currentStep / totalSteps) * 100);
+      
+      document.getElementById('dash-active-course-bar').style.width = `${pct}%`;
+      document.getElementById('dash-active-course-step').textContent = `Step ${currentStep + 1} of ${totalSteps} (${pct}% completed)`;
+    } else {
+      activeCard.classList.add('hidden');
+    }
+  }
 
   setRandomStudyTip();
 }
@@ -504,6 +603,10 @@ function appendMessage(role, text) {
     <div class="msg-bubble">${formattedText}</div>
   `;
   container.appendChild(div);
+  
+  const bubble = div.querySelector('.msg-bubble');
+  renderMath(bubble);
+  
   container.scrollTop = container.scrollHeight;
 }
 
@@ -556,18 +659,30 @@ function renderSubjectPage(subjectName) {
   const prettyName = subjectName.charAt(0).toUpperCase() + subjectName.slice(1);
   const realName = Object.keys(subjectData).find(k => k.toLowerCase() === subjectName.toLowerCase()) || prettyName;
   
-  // Extra topics for all subjects
-  const extendedTopics = {
-    'Maths': ['Finance', 'Algebra', 'Measurement', 'Graphing', 'Scatterplots', 'Geometry', 'Statistics', 'Probability', 'Calculus', 'Trigonometry'],
-    'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Biology', 'Physics', 'Ecosystems', 'Chemical Reactions'],
-    'Systems Technology': ['Wiring', 'Coding', 'Arduino', 'Circuit', 'Electricity', 'Robotics', 'Microcontrollers', 'Sensors', 'Logic Gates'],
-    'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques', 'Poetry Analysis', 'Creative Writing', 'Grammar', 'Textual Analysis'],
-    'History': ['WW2', 'Holocaust', 'Essay', 'Ancient Rome', 'Cold War', 'Industrial Revolution', 'Civil Rights Movement'],
-    'Media Studies': ['Essay', 'Misery (Film)', 'Film Techniques', 'Camera Techniques', 'Lighting', 'Sound Design', 'Editing', 'Mise-en-scene', 'Media Ethics']
-  };
-  
   const topics = extendedTopics[realName] || subjectData[realName] || [];
   const notesList = state.studyNotes[realName] || [];
+
+  let activeCourseBanner = '';
+  if (state.activeCourse && state.activeCourse.subject.toLowerCase() === realName.toLowerCase()) {
+    const currentStep = state.activeCourse.currentItem;
+    const totalSteps = state.activeCourse.items.length;
+    const pct = Math.round((currentStep / totalSteps) * 100);
+    activeCourseBanner = `
+      <div class="card clickable" id="subject-active-course-banner" style="border: 2px solid #8b7cf8; background: rgba(139,124,248,0.05); margin-bottom: 24px; cursor: pointer;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <h3 style="margin:0; font-size:16px;">Active Course: ${state.activeCourse.topic}</h3>
+            <p style="margin:5px 0 0 0; font-size:13px; color:var(--text2);">You are currently taking this progressive study course. Click to resume!</p>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="resumeActiveCourse()">Resume Course →</button>
+        </div>
+        <div class="progress-container" style="margin-top: 15px;">
+          <div class="progress-bar" style="width: ${pct}%; background: #8b7cf8;"></div>
+        </div>
+        <span class="progress-label" style="font-weight: 600;">Step ${currentStep + 1} of ${totalSteps} (${pct}% completed)</span>
+      </div>
+    `;
+  }
   
   document.getElementById('subject-page-content').innerHTML = `
     <div class="page-header">
@@ -576,6 +691,8 @@ function renderSubjectPage(subjectName) {
         <p class="page-subtitle">Master these topics</p>
       </div>
     </div>
+
+    ${activeCourseBanner}
     
     <div id="saved-notes-section" style="margin-bottom: 24px;">
       <h3>Your Study Notes</h3>
@@ -597,11 +714,14 @@ function renderSubjectPage(subjectName) {
     
     <div class="card" style="margin-bottom: 24px;">
       <h3>Custom Study Topic</h3>
-      <p style="margin-bottom: 12px; font-size: 13px; color: var(--text2);">Don't see what you need below? Type any specific topic for ${realName} to generate a custom quiz or study notes.</p>
-      <div class="chat-input-row" style="max-width: 600px;">
-        <input type="text" id="custom-topic-input" placeholder="e.g. Advanced AI algorithms..." style="flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:var(--radius-sm);" />
-        <button class="btn btn-primary" id="custom-topic-quiz-btn">Quiz</button>
-        <button class="btn btn-ghost" id="custom-topic-notes-btn">Notes</button>
+      <p style="margin-bottom: 12px; font-size: 13px; color: var(--text2);">Don't see what you need below? Type any specific topic for ${realName} to generate custom study tools.</p>
+      <div class="chat-input-row" style="max-width: 600px; display: flex; flex-wrap: wrap; gap: 8px;">
+        <input type="text" id="custom-topic-input" placeholder="e.g. Advanced AI algorithms..." style="flex:1 1 100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:var(--radius-sm);" />
+        <button class="btn btn-primary btn-sm" id="custom-topic-quiz-btn">Quiz</button>
+        <button class="btn btn-ghost btn-sm" id="custom-topic-typed-btn">Short Answer</button>
+        <button class="btn btn-ghost btn-sm" id="custom-topic-matching-btn">Matching</button>
+        <button class="btn btn-ghost btn-sm" id="custom-topic-notes-btn">Notes</button>
+        <button class="btn btn-primary btn-sm" style="background-color: #8b7cf8; color: white;" id="custom-topic-course-btn">Course</button>
       </div>
     </div>
     
@@ -610,9 +730,12 @@ function renderSubjectPage(subjectName) {
         <div class="topic-card">
           <h4>${t}</h4>
           <p>Explore this topic</p>
-          <div class="topic-actions-row">
-            <button class="btn btn-primary btn-sm" onclick="generateQuiz('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Quiz</button>
-            <button class="btn btn-ghost btn-sm" onclick="generateStudyNotes('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Notes</button>
+          <div class="topic-actions-row" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px;">
+            <button class="btn btn-primary btn-sm" style="flex: 1 1 45%;" onclick="generateQuiz('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Quiz</button>
+            <button class="btn btn-ghost btn-sm" style="flex: 1 1 45%;" onclick="generateShortAnswer('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Typed</button>
+            <button class="btn btn-ghost btn-sm" style="flex: 1 1 45%;" onclick="generateMatchingStandalone('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Match</button>
+            <button class="btn btn-ghost btn-sm" style="flex: 1 1 45%;" onclick="generateStudyNotes('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Notes</button>
+            <button class="btn btn-primary btn-sm" style="flex: 1 1 100%; background-color: #8b7cf8; color: white;" onclick="generateCourse('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Full Course</button>
           </div>
         </div>
       `).join('')}
@@ -621,6 +744,14 @@ function renderSubjectPage(subjectName) {
     <div id="subject-notes-area" style="margin-top: 24px;"></div>
   `;
   
+  if (document.getElementById('subject-active-course-banner')) {
+    document.getElementById('subject-active-course-banner').addEventListener('click', (e) => {
+      if (e.target.tagName !== 'BUTTON') {
+        resumeActiveCourse();
+      }
+    });
+  }
+
   document.getElementById('custom-topic-quiz-btn').addEventListener('click', () => {
     const val = document.getElementById('custom-topic-input').value.trim();
     if(val) generateQuiz(realName, val);
@@ -629,6 +760,21 @@ function renderSubjectPage(subjectName) {
   document.getElementById('custom-topic-notes-btn').addEventListener('click', () => {
     const val = document.getElementById('custom-topic-input').value.trim();
     if(val) generateStudyNotes(realName, val);
+  });
+
+  document.getElementById('custom-topic-course-btn').addEventListener('click', () => {
+    const val = document.getElementById('custom-topic-input').value.trim();
+    if(val) generateCourse(realName, val);
+  });
+
+  document.getElementById('custom-topic-typed-btn').addEventListener('click', () => {
+    const val = document.getElementById('custom-topic-input').value.trim();
+    if(val) generateShortAnswer(realName, val);
+  });
+
+  document.getElementById('custom-topic-matching-btn').addEventListener('click', () => {
+    const val = document.getElementById('custom-topic-input').value.trim();
+    if(val) generateMatchingStandalone(realName, val);
   });
 }
 
@@ -679,6 +825,7 @@ window.viewSavedNote = (subject, noteId) => {
       <div style="line-height: 1.6; font-size: 14px; color: var(--text);">${note.content}</div>
     </div>
   `;
+  renderMath(area);
 };
 
 window.editSavedNote = (subject, noteId) => {
@@ -731,7 +878,7 @@ window.generateQuiz = async (subject, topic) => {
     </div>
   `;
   
-  const prompt = `Create a 3 question multiple choice quiz about ${topic} in the context of ${subject}. Return ONLY a JSON array of objects, where each object has: "question" (string), "options" (array of 4 strings), "answer" (index of correct option 0-3), "explanation" (string explaining the answer). NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
+  const prompt = `Create a 6 question multiple choice quiz about ${topic} in the context of ${subject}. Ensure the questions are highly unique, diverse, and randomized each time so the user does not get the same questions repeatedly. Make the questions challenging. Return ONLY a JSON array of objects, where each object has: "question" (string), "options" (array of 4 strings), "answer" (index of correct option 0-3), "explanation" (string explaining the answer). NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
   
   const result = await callGemini(prompt);
   try {
@@ -773,6 +920,7 @@ function renderQuiz(questions) {
         <div id="quiz-feedback-area"></div>
       </div>
     `;
+    renderMath(body);
     
     document.querySelectorAll('.quiz-option').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -794,6 +942,8 @@ function renderQuiz(questions) {
             <button class="btn btn-primary" id="next-q-btn" style="margin-top: 10px">Next</button>
           `;
         }
+        renderMath(document.getElementById('quiz-feedback-area'));
+        
         document.getElementById('next-q-btn').addEventListener('click', () => {
           currentQ++;
           showQuestion();
@@ -804,8 +954,623 @@ function renderQuiz(questions) {
   showQuestion();
 }
 
+window.generateShortAnswer = async (subject, topic) => {
+  const modal = document.getElementById('quiz-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('quiz-modal-title').textContent = `${topic} - Short Answer`;
+  const body = document.getElementById('quiz-modal-body');
+  
+  body.innerHTML = `
+    <div class="quiz-loading">
+      <div class="spinner"></div>
+      <p>Generating typed questions with AI... Please wait.</p>
+    </div>
+  `;
+  
+  const prompt = `Generate exactly 6 short answer questions about ${topic} in the context of ${subject}. Return ONLY a JSON array of 6 objects. Each object must have fields: 'question' (string), 'answer' (exact expected single word or very short phrase), and 'explanation' (string explaining why it is correct). Ensure all generated content is highly unique and accurately reflects ${subject}. NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
+  
+  const result = await callGemini(prompt);
+  try {
+    let raw = result.trim();
+    if(raw.startsWith('```json')) raw = raw.slice(7, -3);
+    if(raw.startsWith('```')) raw = raw.slice(3, -3);
+    const questions = JSON.parse(raw);
+    renderShortAnswerQuiz(questions);
+  } catch(e) {
+    body.innerHTML = `<p>Error generating questions. Please try again.</p>`;
+    console.error(e, result);
+  }
+};
+
+function renderShortAnswerQuiz(questions) {
+  let currentQ = 0;
+  let score = 0;
+  const body = document.getElementById('quiz-modal-body');
+  
+  function showQuestion() {
+    if(currentQ >= questions.length) {
+      body.innerHTML = `
+        <div class="quiz-score">
+          <h3>Short Answer Complete!</h3>
+          <div class="score-num">${score} / ${questions.length}</div>
+          <button class="btn btn-primary" onclick="document.getElementById('quiz-modal').classList.add('hidden')">Close</button>
+        </div>
+      `;
+      return;
+    }
+    
+    const q = questions[currentQ];
+    body.innerHTML = `
+      <div class="quiz-question">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+          <span class="chip chip-blue" style="background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 11px;">Short Answer</span>
+          <span style="font-size: 13px; color: var(--text2);">Question ${currentQ + 1} of ${questions.length}</span>
+        </div>
+        <h4>${q.question}</h4>
+        <div style="margin-top: 15px; margin-bottom: 15px;">
+          <input type="text" id="short-q-input" placeholder="Type your answer here..." style="width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:12px; border-radius:var(--radius-sm); font-size:14px;" autocomplete="off" />
+        </div>
+        <div id="short-q-feedback"></div>
+        <button class="btn btn-primary" id="short-q-submit" style="width: 100%;">Submit Answer</button>
+      </div>
+    `;
+    renderMath(body);
+    
+    const inputEl = document.getElementById('short-q-input');
+    const submitBtn = document.getElementById('short-q-submit');
+    
+    inputEl.focus();
+    inputEl.addEventListener('keyup', (e) => {
+      if (e.key === 'Enter') submitBtn.click();
+    });
+    
+    submitBtn.addEventListener('click', () => {
+      const val = inputEl.value.trim();
+      if(!val) return;
+      
+      inputEl.disabled = true;
+      submitBtn.classList.add('hidden');
+      
+      const checkResult = checkSpelledAnswerClose(val, q.answer);
+      if(checkResult.isCorrect) score++;
+      
+      if(checkResult.isCorrect) {
+        const spellingNotice = checkResult.isExact ? '' : ` (Spelling corrected to: <strong>${q.answer}</strong>)`;
+        document.getElementById('short-q-feedback').innerHTML = `
+          <div class="quiz-feedback correct" style="margin-bottom: 15px;">Correct!${spellingNotice} ${q.explanation}</div>
+          <button class="btn btn-primary" id="short-q-next" style="width: 100%;">Next</button>
+        `;
+      } else {
+        document.getElementById('short-q-feedback').innerHTML = `
+          <div class="quiz-feedback wrong" style="margin-bottom: 15px;">Incorrect. The correct answer was: <strong>${q.answer}</strong>.<br><br>${q.explanation}</div>
+          <button class="btn btn-primary" id="short-q-next" style="width: 100%;">Next</button>
+        `;
+      }
+      renderMath(document.getElementById('short-q-feedback'));
+      
+      document.getElementById('short-q-next').addEventListener('click', () => {
+        currentQ++;
+        showQuestion();
+      });
+    });
+  }
+  
+  showQuestion();
+}
+
+window.generateMatchingStandalone = async (subject, topic) => {
+  const modal = document.getElementById('quiz-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('quiz-modal-title').textContent = `${topic} - Matching`;
+  const body = document.getElementById('quiz-modal-body');
+  
+  body.innerHTML = `
+    <div class="quiz-loading">
+      <div class="spinner"></div>
+      <p>Generating matching pairs with AI... Please wait.</p>
+    </div>
+  `;
+  
+  const prompt = `Generate exactly 6 matching pairs about ${topic} in the context of ${subject}. Return ONLY a JSON array of 6 objects, where each object has 'left' and 'right' properties. Provide the CORRECT pairs, the app will shuffle them. Ensure all generated content is highly unique and accurately reflects ${subject}. NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
+  
+  const result = await callGemini(prompt);
+  try {
+    let raw = result.trim();
+    if(raw.startsWith('```json')) raw = raw.slice(7, -3);
+    if(raw.startsWith('```')) raw = raw.slice(3, -3);
+    const pairs = JSON.parse(raw);
+    renderMatchingStandalone(pairs);
+  } catch(e) {
+    body.innerHTML = `<p>Error generating matching pairs. Please try again.</p>`;
+    console.error(e, result);
+  }
+};
+
+function renderMatchingStandalone(pairs) {
+  const body = document.getElementById('quiz-modal-body');
+  const lefts = pairs.map((p, i) => ({ text: p.left, id: i }));
+  const rights = pairs.map((p, i) => ({ text: p.right, id: i })).sort(() => Math.random() - 0.5);
+  
+  body.innerHTML = `
+    <div class="quiz-question">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+        <span class="chip chip-blue" style="background: var(--bg2); border: 1px solid var(--border); color: var(--text); padding: 4px 8px; border-radius: 4px; font-size: 11px;">Matching</span>
+        <span style="font-size: 13px; color: var(--text2);">6 pairs to match</span>
+      </div>
+      <h4>Match the pairs correctly</h4>
+      <div class="match-grid-container">
+        <div class="match-col" id="match-left-col">
+          ${lefts.map(l => `<button class="match-card match-btn-l" data-id="${l.id}">${l.text}</button>`).join('')}
+        </div>
+        <div class="match-col" id="match-right-col">
+          ${rights.map(r => `<button class="match-card match-btn-r" data-id="${r.id}">${r.text}</button>`).join('')}
+        </div>
+      </div>
+      <div id="matching-feedback"></div>
+      <button class="btn btn-primary hidden" id="matching-close-btn" style="margin-top: 20px; width: 100%;">Close</button>
+    </div>
+  `;
+  
+  let selectedLeft = null;
+  let selectedRight = null;
+  let matchedCount = 0;
+  let lockout = false;
+  
+  const leftBtns = document.querySelectorAll('.match-btn-l');
+  const rightBtns = document.querySelectorAll('.match-btn-r');
+  
+  function checkMatch() {
+    if (!selectedLeft || !selectedRight) return;
+    lockout = true;
+    
+    const leftId = selectedLeft.getAttribute('data-id');
+    const rightId = selectedRight.getAttribute('data-id');
+    
+    if (leftId === rightId) {
+      selectedLeft.classList.remove('selected');
+      selectedRight.classList.remove('selected');
+      selectedLeft.classList.add('matched');
+      selectedRight.classList.add('matched');
+      selectedLeft.disabled = true;
+      selectedRight.disabled = true;
+      
+      selectedLeft = null;
+      selectedRight = null;
+      matchedCount++;
+      lockout = false;
+      
+      if (matchedCount === pairs.length) {
+        document.getElementById('matching-feedback').innerHTML = '<p style="color: var(--success); margin-top: 15px; font-weight: bold; text-align: center;">🎉 All matched correctly!</p>';
+        document.getElementById('matching-close-btn').classList.remove('hidden');
+      }
+    } else {
+      const cardL = selectedLeft;
+      const cardR = selectedRight;
+      
+      cardL.classList.remove('selected');
+      cardR.classList.remove('selected');
+      cardL.classList.add('mismatched');
+      cardR.classList.add('mismatched');
+      
+      setTimeout(() => {
+        cardL.classList.remove('mismatched');
+        cardR.classList.remove('mismatched');
+        selectedLeft = null;
+        selectedRight = null;
+        lockout = false;
+      }, 600);
+    }
+  }
+  
+  leftBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled || lockout) return;
+      leftBtns.forEach(b => b.classList.remove('selected'));
+      if (selectedLeft === btn) {
+        selectedLeft = null;
+      } else {
+        btn.classList.add('selected');
+        selectedLeft = btn;
+        checkMatch();
+      }
+    });
+  });
+  
+  rightBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled || lockout) return;
+      rightBtns.forEach(b => b.classList.remove('selected'));
+      if (selectedRight === btn) {
+        selectedRight = null;
+      } else {
+        btn.classList.add('selected');
+        selectedRight = btn;
+        checkMatch();
+      }
+    });
+  });
+  
+  document.getElementById('matching-close-btn').addEventListener('click', () => {
+    document.getElementById('quiz-modal').classList.add('hidden');
+  });
+}
+
 document.getElementById('quiz-modal-close').addEventListener('click', () => {
   document.getElementById('quiz-modal').classList.add('hidden');
+});
+
+window.generateCourse = async (subject, topic) => {
+  const modal = document.getElementById('course-modal');
+  modal.classList.remove('hidden');
+  document.getElementById('course-modal-title').textContent = `${topic} Course`;
+  const body = document.getElementById('course-modal-body');
+  
+  body.innerHTML = `
+    <div class="quiz-loading">
+      <div class="spinner"></div>
+      <p>Generating a full course with AI... This might take a moment.</p>
+    </div>
+  `;
+  
+  const prompt = `Create a 30-item progressively harder course about ${topic} in the context of ${subject}. The course should include a variety of item types in this order to build knowledge: 'notes' (short revision text), 'flashcard' (concept and definition), 'matching' (match pairs), 'quiz' (multiple choice), 'shortanswer' (a typed response question), and 'workout' (a question requiring step-by-step working out). Return ONLY a JSON array of 30 objects. Each object must have a 'type' field ('quiz', 'flashcard', 'notes', 'matching', 'shortanswer', or 'workout'). 
+For 'quiz': include 'question', 'options' (array of 4 strings), 'answer' (index 0-3), 'explanation'.
+For 'flashcard': include 'front' (a clear question asking about a term or concept, e.g. "What is a gene?"), 'back' (the detailed definition or explanation).
+For 'notes': include 'content' (HTML formatted revision notes, simple tags like <p>, <ul>, <li>, <strong>).
+For 'matching': include 'pairs' (array of 3-4 objects with 'left' and 'right' properties. Provide the CORRECT pairs, the app will shuffle them).
+For 'shortanswer': include 'question' (typed question), 'answer' (exact expected single word or simple phrase answer), 'explanation'.
+For 'workout': include 'question' and 'solution' (step-by-step text).
+Ensure all generated content is highly unique, challenging, and accurately reflects ${subject}. NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
+  
+  const result = await callGemini(prompt);
+  try {
+    let raw = result.trim();
+    if(raw.startsWith('```json')) raw = raw.slice(7, -3);
+    if(raw.startsWith('```')) raw = raw.slice(3, -3);
+    const courseItems = JSON.parse(raw);
+    
+    // Save to activeCourse state
+    state.activeCourse = {
+      subject,
+      topic,
+      items: courseItems,
+      currentItem: 0
+    };
+    saveState();
+    
+    renderCourse(courseItems, subject, topic, 0);
+  } catch(e) {
+    body.innerHTML = `<p>Error generating course. Please try again.</p>`;
+    console.error(e, result);
+  }
+};
+
+window.resumeActiveCourse = () => {
+  if (state.activeCourse && state.activeCourse.items && state.activeCourse.items.length > 0) {
+    const modal = document.getElementById('course-modal');
+    modal.classList.remove('hidden');
+    document.getElementById('course-modal-title').textContent = `${state.activeCourse.topic} Course`;
+    renderCourse(state.activeCourse.items, state.activeCourse.subject, state.activeCourse.topic, state.activeCourse.currentItem);
+  }
+};
+
+function renderCourse(items, subject, topic, resumeIndex = 0) {
+  let currentItem = resumeIndex;
+  const body = document.getElementById('course-modal-body');
+  
+  function showItem() {
+    if(currentItem >= items.length) {
+      // Mark course as completed for this subject/topic
+      if (!state.completedCourses) state.completedCourses = {};
+      if (!state.completedCourses[subject]) state.completedCourses[subject] = [];
+      if (!state.completedCourses[subject].includes(topic)) {
+        state.completedCourses[subject].push(topic);
+        
+        // Update progress
+        const topicsList = extendedTopics[subject] || subjectData[subject] || [];
+        const total = topicsList.length || 1;
+        const completed = state.completedCourses[subject].length;
+        state.subjectProgress[subject] = Math.min(100, Math.round((completed / total) * 100));
+      }
+      
+      // Reset active course when complete
+      if (state.activeCourse && state.activeCourse.subject === subject && state.activeCourse.topic === topic) {
+        state.activeCourse = null;
+      }
+      saveState();
+
+      body.innerHTML = `
+        <div class="quiz-score">
+          <h3>Course Complete!</h3>
+          <p>You've successfully finished this course.</p>
+          <button class="btn btn-primary" onclick="document.getElementById('course-modal').classList.add('hidden')">Close</button>
+        </div>
+      `;
+      return;
+    }
+    
+    // Save/update intermediate progress
+    if (state.activeCourse && state.activeCourse.subject === subject && state.activeCourse.topic === topic) {
+      state.activeCourse.currentItem = currentItem;
+      saveState();
+    }
+    
+    const item = items[currentItem];
+    const headerHtml = `
+      <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+        <span class="chip chip-blue" style="text-transform: capitalize;">${item.type}</span>
+        <span style="font-size: 13px; color: var(--text2);">Step ${currentItem + 1} of ${items.length}</span>
+      </div>
+    `;
+    
+    if (item.type === 'notes') {
+      body.innerHTML = `
+        <div class="quiz-question">
+          ${headerHtml}
+          <div style="line-height: 1.6; font-size: 14px; background: var(--bg3); padding: 15px; border-radius: var(--radius-md);">
+            ${item.content}
+          </div>
+          <button class="btn btn-primary" id="course-next-btn" style="margin-top: 20px; width: 100%;">Continue</button>
+        </div>
+      `;
+      document.getElementById('course-next-btn').addEventListener('click', () => { currentItem++; showItem(); });
+    } 
+    else if (item.type === 'flashcard') {
+      body.innerHTML = `
+        <div class="quiz-question">
+          ${headerHtml}
+          <div id="flashcard-container" style="perspective: 1000px; cursor: pointer; height: 200px; margin-bottom: 20px;">
+            <div id="flashcard-inner" style="width: 100%; height: 100%; transition: transform 0.6s; transform-style: preserve-3d; position: relative;">
+              <div style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: var(--bg3); display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); border: 2px solid var(--border); padding: 20px; text-align: center;">
+                <h3 style="margin:0;">${item.front}</h3>
+                <span style="position:absolute; bottom: 10px; font-size: 11px; color: var(--text2);">Click to flip</span>
+              </div>
+              <div style="position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: var(--secondary); color: white; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-md); padding: 20px; text-align: center; transform: rotateY(180deg);">
+                <p style="margin:0;">${item.back}</p>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="course-next-btn" style="width: 100%;">Got it!</button>
+        </div>
+      `;
+      let flipped = false;
+      document.getElementById('flashcard-container').addEventListener('click', () => {
+        flipped = !flipped;
+        document.getElementById('flashcard-inner').style.transform = flipped ? 'rotateY(180deg)' : 'rotateY(0deg)';
+      });
+      document.getElementById('course-next-btn').addEventListener('click', () => { currentItem++; showItem(); });
+    }
+    else if (item.type === 'quiz') {
+      body.innerHTML = `
+        <div class="quiz-question">
+          ${headerHtml}
+          <h4>${item.question}</h4>
+          <div class="quiz-options">
+            ${item.options.map((opt, i) => `<button class="quiz-option course-opt" data-idx="${i}">${opt}</button>`).join('')}
+          </div>
+          <div id="course-feedback-area"></div>
+        </div>
+      `;
+      
+      document.querySelectorAll('.course-opt').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          if(btn.disabled) return;
+          document.querySelectorAll('.course-opt').forEach(b => b.disabled = true);
+          const selected = parseInt(e.target.getAttribute('data-idx'));
+          if(selected === item.answer) {
+            e.target.classList.add('correct');
+            document.getElementById('course-feedback-area').innerHTML = `
+              <div class="quiz-feedback correct">Correct! ${item.explanation}</div>
+              <button class="btn btn-primary" id="course-next-btn" style="margin-top: 10px">Next</button>
+            `;
+          } else {
+            e.target.classList.add('wrong');
+            document.querySelectorAll('.course-opt')[item.answer].classList.add('correct');
+            document.getElementById('course-feedback-area').innerHTML = `
+              <div class="quiz-feedback wrong">Incorrect. ${item.explanation}</div>
+              <button class="btn btn-primary" id="course-next-btn" style="margin-top: 10px">Next</button>
+            `;
+          }
+          document.getElementById('course-next-btn').addEventListener('click', () => {
+            currentItem++;
+            showItem();
+          });
+        });
+      });
+    }
+    else if (item.type === 'workout') {
+      body.innerHTML = `
+        <div class="quiz-question">
+          ${headerHtml}
+          <h4>${item.question}</h4>
+          <p style="font-size: 13px; color: var(--text2); margin-bottom: 10px;">Work out the answer on paper, then check the solution.</p>
+          <button class="btn btn-ghost" id="show-solution-btn" style="width: 100%; margin-bottom: 15px;">Show Solution</button>
+          <div id="solution-area" class="hidden" style="background: var(--bg3); padding: 15px; border-radius: var(--radius-md); margin-bottom: 20px;">
+            ${item.solution.replace(/\n/g, '<br>')}
+          </div>
+          <button class="btn btn-primary hidden" id="course-next-btn" style="width: 100%;">Next</button>
+        </div>
+      `;
+      document.getElementById('show-solution-btn').addEventListener('click', (e) => {
+        e.target.classList.add('hidden');
+        document.getElementById('solution-area').classList.remove('hidden');
+        document.getElementById('course-next-btn').classList.remove('hidden');
+      });
+      document.getElementById('course-next-btn').addEventListener('click', () => { currentItem++; showItem(); });
+    }
+    else if (item.type === 'matching') {
+      const lefts = item.pairs.map((p, i) => ({ text: p.left, id: i }));
+      const rights = item.pairs.map((p, i) => ({ text: p.right, id: i })).sort(() => Math.random() - 0.5);
+      
+      body.innerHTML = `
+        <div class="quiz-question">
+          ${headerHtml}
+          <h4>Match the pairs correctly</h4>
+          <div class="match-grid-container">
+            <div class="match-col" id="match-left-col">
+              ${lefts.map(l => `<button class="match-card match-btn-l" data-id="${l.id}">${l.text}</button>`).join('')}
+            </div>
+            <div class="match-col" id="match-right-col">
+              ${rights.map(r => `<button class="match-card match-btn-r" data-id="${r.id}">${r.text}</button>`).join('')}
+            </div>
+          </div>
+          <div id="matching-feedback"></div>
+          <button class="btn btn-primary hidden" id="course-next-btn" style="margin-top: 20px; width: 100%;">Next</button>
+        </div>
+      `;
+      
+      let selectedLeft = null;
+      let selectedRight = null;
+      let matchedCount = 0;
+      let lockout = false;
+      
+      const leftBtns = document.querySelectorAll('.match-btn-l');
+      const rightBtns = document.querySelectorAll('.match-btn-r');
+      
+      function checkMatch() {
+        if (!selectedLeft || !selectedRight) return;
+        lockout = true;
+        
+        const leftId = selectedLeft.getAttribute('data-id');
+        const rightId = selectedRight.getAttribute('data-id');
+        
+        if (leftId === rightId) {
+          // Success match
+          selectedLeft.classList.remove('selected');
+          selectedRight.classList.remove('selected');
+          selectedLeft.classList.add('matched');
+          selectedRight.classList.add('matched');
+          selectedLeft.disabled = true;
+          selectedRight.disabled = true;
+          
+          selectedLeft = null;
+          selectedRight = null;
+          matchedCount++;
+          lockout = false;
+          
+          if (matchedCount === item.pairs.length) {
+            document.getElementById('matching-feedback').innerHTML = '<p style="color: var(--success); margin-top: 15px; font-weight: bold; text-align: center;">🎉 All matched correctly!</p>';
+            document.getElementById('course-next-btn').classList.remove('hidden');
+          }
+        } else {
+          // Mismatch
+          const cardL = selectedLeft;
+          const cardR = selectedRight;
+          
+          cardL.classList.remove('selected');
+          cardR.classList.remove('selected');
+          cardL.classList.add('mismatched');
+          cardR.classList.add('mismatched');
+          
+          setTimeout(() => {
+            cardL.classList.remove('mismatched');
+            cardR.classList.remove('mismatched');
+            selectedLeft = null;
+            selectedRight = null;
+            lockout = false;
+          }, 600);
+        }
+      }
+      
+      leftBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.disabled || lockout) return;
+          
+          // Clear active selection in same column
+          leftBtns.forEach(b => b.classList.remove('selected'));
+          
+          if (selectedLeft === btn) {
+            // Toggle selection
+            selectedLeft = null;
+          } else {
+            btn.classList.add('selected');
+            selectedLeft = btn;
+            checkMatch();
+          }
+        });
+      });
+      
+      rightBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+          if (btn.disabled || lockout) return;
+          
+          // Clear active selection in same column
+          rightBtns.forEach(b => b.classList.remove('selected'));
+          
+          if (selectedRight === btn) {
+            // Toggle selection
+            selectedRight = null;
+          } else {
+            btn.classList.add('selected');
+            selectedRight = btn;
+            checkMatch();
+          }
+        });
+      });
+      
+      document.getElementById('course-next-btn').addEventListener('click', () => { currentItem++; showItem(); });
+    }
+    else if (item.type === 'shortanswer') {
+      body.innerHTML = `
+        <div class="quiz-question">
+          ${headerHtml}
+          <h4>${item.question}</h4>
+          <div style="margin-top: 15px; margin-bottom: 15px;">
+            <input type="text" id="shortanswer-input" placeholder="Type your answer here..." style="width:100%; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:12px; border-radius:var(--radius-sm); font-size:14px;" autocomplete="off" />
+          </div>
+          <div id="course-feedback-area"></div>
+          <button class="btn btn-primary" id="shortanswer-submit-btn" style="width: 100%;">Submit Answer</button>
+        </div>
+      `;
+      
+      const inputEl = document.getElementById('shortanswer-input');
+      const submitBtn = document.getElementById('shortanswer-submit-btn');
+      
+      inputEl.focus();
+      inputEl.addEventListener('keyup', (e) => {
+        if (e.key === 'Enter') submitBtn.click();
+      });
+      
+      submitBtn.addEventListener('click', () => {
+        const val = inputEl.value.trim();
+        if(!val) return;
+        
+        inputEl.disabled = true;
+        submitBtn.classList.add('hidden');
+        
+        const checkResult = checkSpelledAnswerClose(val, item.answer);
+        
+        if (checkResult.isCorrect) {
+          const spellingNotice = checkResult.isExact ? '' : ` (Spelling corrected to: <strong>${item.answer}</strong>)`;
+          document.getElementById('course-feedback-area').innerHTML = `
+            <div class="quiz-feedback correct" style="margin-bottom:15px;">Correct!${spellingNotice} ${item.explanation}</div>
+            <button class="btn btn-primary" id="course-next-btn" style="width:100%;">Next</button>
+          `;
+        } else {
+          document.getElementById('course-feedback-area').innerHTML = `
+            <div class="quiz-feedback wrong" style="margin-bottom:15px;">Incorrect. The correct answer is: <strong>${item.answer}</strong>.<br><br>${item.explanation}</div>
+            <button class="btn btn-primary" id="course-next-btn" style="width:100%;">Next</button>
+          `;
+        }
+        
+        document.getElementById('course-next-btn').addEventListener('click', () => {
+          currentItem++;
+          showItem();
+        });
+      });
+    }
+    else {
+      // Fallback
+      currentItem++; showItem();
+    }
+    
+    renderMath(body);
+  }
+  
+  showItem();
+}
+
+document.getElementById('course-modal-close').addEventListener('click', () => {
+  document.getElementById('course-modal').classList.add('hidden');
 });
 
 // Import / Export
@@ -843,9 +1608,18 @@ document.getElementById('import-file-input').addEventListener('change', (e) => {
 
 // Start
 function setupEventListeners() {
+  const dashActive = document.getElementById('dash-active-course-card');
+  if(dashActive) dashActive.addEventListener('click', () => {
+    resumeActiveCourse();
+  });
+
   const dashQuiz = document.getElementById('dash-quiz-card');
   if(dashQuiz) dashQuiz.addEventListener('click', () => {
-    document.getElementById('nav-ai-chat').click();
+    const subjects = Object.keys(extendedTopics);
+    const randomSubject = subjects[Math.floor(Math.random() * subjects.length)];
+    const topics = extendedTopics[randomSubject];
+    const randomTopic = topics[Math.floor(Math.random() * topics.length)];
+    generateQuiz(randomSubject, randomTopic);
   });
   
   const dashDaily = document.getElementById('dash-daily-card');
@@ -896,7 +1670,7 @@ function setupDailyActivity() {
       newStartBtn.textContent = "Generating...";
       
       const safeFocus = Array.isArray(state.focusSubjects) ? state.focusSubjects.join(', ') : 'None';
-      const prompt = `Create a 20 question multiple choice quiz covering a variety of topics from different subjects. Prioritize topics from the following subjects: ${safeFocus}. Include questions from Maths, Science, Systems Technology, English, History, Media Studies. Return ONLY a JSON array of objects, where each object has: "question" (string), "options" (array of 4 strings), "answer" (index of correct option 0-3), "explanation" (string explaining the answer). NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
+      const prompt = `Create a 20 question multiple choice quiz covering a variety of topics from different subjects. Prioritize topics from the following subjects: ${safeFocus}. Include questions from Maths, Science, Systems Technology, English, History, Media Studies. Ensure questions are highly unique, diverse, and randomized to avoid repeating common questions. Return ONLY a JSON array of objects, where each object has: "question" (string), "options" (array of 4 strings), "answer" (index of correct option 0-3), "explanation" (string explaining the answer). NO MARKDOWN BLOCKS, JUST RAW JSON ARRAY.`;
       
       const result = await callGemini(prompt);
       try {
