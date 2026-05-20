@@ -91,12 +91,37 @@ function checkSpelledAnswerClose(userInput, correctAnswer) {
   return { isCorrect: false, isExact: false };
 }
 
+function getMelbourneYearMonthDay(date) {
+  const formatter = new Intl.DateTimeFormat('en-AU', {
+    timeZone: 'Australia/Melbourne',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  const parts = formatter.formatToParts(date);
+  const day = parts.find(p => p.type === 'day').value;
+  const month = parts.find(p => p.type === 'month').value;
+  const year = parts.find(p => p.type === 'year').value;
+  return { year: parseInt(year), month: parseInt(month), day: parseInt(day) };
+}
+
+function getMelbourneDaysDifference(examDateStr) {
+  if (!examDateStr) return 0;
+  const [examY, examM, examD] = examDateStr.split('-').map(Number);
+  const melbParts = getMelbourneYearMonthDay(new Date());
+  const d1 = new Date(melbParts.year, melbParts.month - 1, melbParts.day);
+  const d2 = new Date(examY, examM - 1, examD);
+  const diffTime = d2 - d1;
+  const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+
 // Hardcoded topics based on prompt
 const subjectData = {
   'Maths': ['Finance', 'Algebra', 'Measurement', 'Graphing', 'Scatterplots'],
   'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Periodic Table', 'Chemical Bonding'],
   'Systems Technology': ['Wiring', 'Coding', 'Arduino', 'Circuit', 'Electricity'],
-  'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques'],
+  'English': ['How to Write a Good Essay', 'Writing a Good Analysis Essay', 'Macbeth (Play)', 'Writing Techniques'],
   'History': ['WW2', 'Holocaust', 'Essay'],
   'Media Studies': ['Essay', 'Misery (Film)', 'Film Techniques', 'Camera Techniques', 'Lighting']
 };
@@ -105,7 +130,7 @@ const extendedTopics = {
   'Maths': ['Finance', 'Algebra', 'Measurement', 'Graphing', 'Scatterplots', 'Geometry', 'Statistics', 'Probability', 'Calculus', 'Trigonometry'],
   'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Biology', 'Physics', 'Ecosystems', 'Periodic Table', 'Chemical Bonding'],
   'Systems Technology': ['Wiring', 'Coding', 'Arduino', 'Circuit', 'Electricity', 'Robotics', 'Microcontrollers', 'Sensors', 'Logic Gates'],
-  'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques', 'Poetry Analysis', 'Creative Writing', 'Grammar', 'Textual Analysis'],
+  'English': ['How to Write a Good Essay', 'Writing a Good Analysis Essay', 'Macbeth (Play)', 'Writing Techniques', 'Poetry Analysis', 'Creative Writing', 'Grammar', 'Textual Analysis'],
   'History': ['WW2', 'Holocaust', 'Essay', 'Ancient Rome', 'Cold War', 'Industrial Revolution', 'Civil Rights Movement'],
   'Media Studies': ['Essay', 'Misery (Film)', 'Film Techniques', 'Camera Techniques', 'Lighting', 'Sound Design', 'Editing', 'Mise-en-scene', 'Media Ethics']
 };
@@ -248,15 +273,17 @@ function renderDashboard() {
   // Upcoming Exams
   const upcomingList = document.getElementById('upcoming-exams-list');
   const upcoming = [...state.exams].sort((a,b) => new Date(a.date) - new Date(b.date))
-    .filter(e => new Date(e.date) >= new Date().setHours(0,0,0,0))
+    .filter(e => getMelbourneDaysDifference(e.date) >= 0)
     .slice(0, 6);
 
   if (upcoming.length > 0) {
     upcomingList.innerHTML = upcoming.map(exam => {
-      const days = Math.ceil((new Date(exam.date) - new Date()) / (1000 * 60 * 60 * 24));
+      const days = getMelbourneDaysDifference(exam.date);
       let badge = 'days-ok';
       if(days <= 3) badge = 'days-urgent';
       else if(days <= 7) badge = 'days-soon';
+      
+      const daysLabel = days === 0 ? 'Today' : (days === 1 ? '1 day' : days + ' days');
       
       return `
         <div class="exam-item">
@@ -264,7 +291,7 @@ function renderDashboard() {
             <span class="exam-item-name">${exam.name} (${exam.subject})</span>
             <span class="exam-item-date">${new Date(exam.date).toLocaleDateString()}</span>
           </div>
-          <span class="exam-days-left ${badge}">${days === 0 ? 'Today' : days + ' days'}</span>
+          <span class="exam-days-left ${badge}">${daysLabel}</span>
         </div>
       `;
     }).join('');
@@ -367,8 +394,8 @@ function renderCalendar() {
 
   // 2. Render Calendar Grid
   const calDays = document.getElementById('cal-days');
-  const now = new Date();
-  const todayString = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const melbParts = getMelbourneYearMonthDay(new Date());
+  const todayString = `${melbParts.year}-${String(melbParts.month).padStart(2,'0')}-${String(melbParts.day).padStart(2,'0')}`;
   
   const d = new Date(currentCalYear, currentCalMonth);
   document.getElementById('cal-month-label').textContent = d.toLocaleDateString('default', { month: 'long', year: 'numeric' });
@@ -1872,6 +1899,72 @@ const fallbackMindMaps = {
           { "topic": "Electron Sea", "note": "Valence electrons detach from individual nuclei and flow freely among metal cations." },
           { "topic": "Malleability", "note": "Allows metal layers to slide over one another without shattering when struck." },
           { "topic": "Conductivity", "note": "The free-flowing electron sea enables rapid transport of electrical charge and heat." }
+        ]
+      }
+    ]
+  },
+  'how to write a good essay': {
+    "topic": "How to Write a Good Essay",
+    "note": "A structured guide to crafting compelling, well-argued, and cohesive academic essays.",
+    "children": [
+      {
+        "topic": "Planning & Outline",
+        "note": "Initial brainstorming, research formulation, and creating a strong structural outline.",
+        "children": [
+          { "topic": "Thesis Statement", "note": "A clear, concise, and argumentative sentence defining the essay's core purpose." },
+          { "topic": "Essay Outline", "note": "Structuring paragraphs: Introduction, Body Paragraphs, and a strong Conclusion." },
+          { "topic": "Evidence Gathering", "note": "Collecting secondary sources, quotes, and facts to substantiate arguments." }
+        ]
+      },
+      {
+        "topic": "Drafting Structure",
+        "note": "Writing the essay focusing on the introduction, TEEL body paragraphs, and conclusion.",
+        "children": [
+          { "topic": "Hook & Intro", "note": "Grabbing reader attention and providing brief background before the thesis." },
+          { "topic": "TEEL Structure", "note": "Topic sentence, Explanation, Evidence, and Linking back to the main thesis." },
+          { "topic": "Conclusion", "note": "Synthesizing main points and providing a final thought without adding new facts." }
+        ]
+      },
+      {
+        "topic": "Refining & Editing",
+        "note": "Polishing vocabulary, checking flow and transitions, and meticulous proofreading.",
+        "children": [
+          { "topic": "Transitions", "note": "Using cohesive words (e.g. furthermore, however) to bridge adjacent ideas." },
+          { "topic": "Clarity & Tone", "note": "Ensuring an academic, objective voice that avoids slang and passive syntax." },
+          { "topic": "Proofreading", "note": "Inspecting spelling, grammar, punctuation, and correcting citations." }
+        ]
+      }
+    ]
+  },
+  'writing a good analysis essay': {
+    "topic": "Writing a Good Analysis Essay",
+    "note": "An analytical guide to deconstructing a text, film, or event and evaluating its components.",
+    "children": [
+      {
+        "topic": "Deconstruction",
+        "note": "Analyzing the source material to identify literary, cinematic, or historical techniques.",
+        "children": [
+          { "topic": "Close Reading", "note": "Meticulously analyzing specific passages or scenes to uncover deeper meanings." },
+          { "topic": "Technique ID", "note": "Identifying metaphors, symbolism, themes, camera shots, or rhetorical devices." },
+          { "topic": "Authorial Intent", "note": "Evaluating why the creator used specific styles to impact the audience." }
+        ]
+      },
+      {
+        "topic": "Analytical Argument",
+        "note": "Formulating a thesis that explains how the techniques build the central message.",
+        "children": [
+          { "topic": "Analytical Thesis", "note": "Declaring what the text does, how it does it, and the resulting thematic impact." },
+          { "topic": "Evidence Selection", "note": "Choosing specific quotes or details that showcase the technique in action." },
+          { "topic": "Critique Depth", "note": "Explaining the link between the device, subtext, and the cultural context." }
+        ]
+      },
+      {
+        "topic": "Cohesive Writing",
+        "note": "Structuring body paragraphs with detailed textual analysis and solid flow.",
+        "children": [
+          { "topic": "Analytical Flow", "note": "Ensuring paragraphs move logically from identifying devices to explaining subtext." },
+          { "topic": "Embedding Quotes", "note": "Smoothly integrating quotations into your own sentence structures." },
+          { "topic": "Evaluative Tone", "note": "Using active, analytical verbs (e.g. depicts, exemplifies, contextualizes)." }
         ]
       }
     ]
