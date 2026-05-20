@@ -94,7 +94,7 @@ function checkSpelledAnswerClose(userInput, correctAnswer) {
 // Hardcoded topics based on prompt
 const subjectData = {
   'Maths': ['Finance', 'Algebra', 'Measurement', 'Graphing', 'Scatterplots'],
-  'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry'],
+  'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Periodic Table', 'Chemical Bonding'],
   'Systems Technology': ['Wiring', 'Coding', 'Arduino', 'Circuit', 'Electricity'],
   'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques'],
   'History': ['WW2', 'Holocaust', 'Essay'],
@@ -103,7 +103,7 @@ const subjectData = {
 
 const extendedTopics = {
   'Maths': ['Finance', 'Algebra', 'Measurement', 'Graphing', 'Scatterplots', 'Geometry', 'Statistics', 'Probability', 'Calculus', 'Trigonometry'],
-  'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Biology', 'Physics', 'Ecosystems', 'Chemical Reactions'],
+  'Science': ['DNA', 'Chromosomes and Genes', 'Mass, Acceleration and Gravity', 'Position, Distance and Displacement', 'Chemistry', 'Biology', 'Physics', 'Ecosystems', 'Periodic Table', 'Chemical Bonding'],
   'Systems Technology': ['Wiring', 'Coding', 'Arduino', 'Circuit', 'Electricity', 'Robotics', 'Microcontrollers', 'Sensors', 'Logic Gates'],
   'English': ['Essay Writing', 'Macbeth (Play)', 'Writing Techniques', 'Poetry Analysis', 'Creative Writing', 'Grammar', 'Textual Analysis'],
   'History': ['WW2', 'Holocaust', 'Essay', 'Ancient Rome', 'Cold War', 'Industrial Revolution', 'Civil Rights Movement'],
@@ -210,12 +210,14 @@ function renderDashboard() {
   const focusText = document.getElementById('focus-text');
   const focusBadges = document.getElementById('focus-badges');
   
-  if (safeFocus.length > 0) {
-    focusText.innerHTML = `You've identified <strong>${safeFocus.join(', ')}</strong> as your priority subjects.`;
-    focusBadges.innerHTML = safeFocus.map(sub => `<span class="chip chip-default">${sub}</span>`).join('');
-  } else {
-    focusText.innerHTML = "You haven't set your focus subjects yet. Head to Settings to update them!";
-    focusBadges.innerHTML = '';
+  if (focusText && focusBadges) {
+    if (safeFocus.length > 0) {
+      focusText.innerHTML = `You've identified <strong>${safeFocus.join(', ')}</strong> as your priority subjects.`;
+      focusBadges.innerHTML = safeFocus.map(sub => `<span class="chip chip-default">${sub}</span>`).join('');
+    } else {
+      focusText.innerHTML = "You haven't set your focus subjects yet. Head to Settings to update them!";
+      focusBadges.innerHTML = '';
+    }
   }
 
   // Update nav priority badges
@@ -247,7 +249,7 @@ function renderDashboard() {
   const upcomingList = document.getElementById('upcoming-exams-list');
   const upcoming = [...state.exams].sort((a,b) => new Date(a.date) - new Date(b.date))
     .filter(e => new Date(e.date) >= new Date().setHours(0,0,0,0))
-    .slice(0,3);
+    .slice(0, 6);
 
   if (upcoming.length > 0) {
     upcomingList.innerHTML = upcoming.map(exam => {
@@ -272,15 +274,17 @@ function renderDashboard() {
 
   // Subject Progress
   const progList = document.getElementById('subject-progress-list');
-  progList.innerHTML = Object.entries(state.subjectProgress).map(([sub, val]) => `
-    <div class="subject-prog-item">
-      <div class="subject-prog-label">
-        <span class="subject-prog-name">${sub}</span>
-        <span class="subject-prog-pct">${val}%</span>
+  if (progList) {
+    progList.innerHTML = Object.entries(state.subjectProgress).map(([sub, val]) => `
+      <div class="subject-prog-item">
+        <div class="subject-prog-label">
+          <span class="subject-prog-name">${sub}</span>
+          <span class="subject-prog-pct">${val}%</span>
+        </div>
+        <div class="progress-container"><div class="progress-bar" style="width: ${val}%"></div></div>
       </div>
-      <div class="progress-container"><div class="progress-bar" style="width: ${val}%"></div></div>
-    </div>
-  `).join('');
+    `).join('');
+  }
 
   // Active Course Card
   const activeCard = document.getElementById('dash-active-course-card');
@@ -721,6 +725,7 @@ function renderSubjectPage(subjectName) {
         <button class="btn btn-ghost btn-sm" id="custom-topic-typed-btn">Short Answer</button>
         <button class="btn btn-ghost btn-sm" id="custom-topic-matching-btn">Matching</button>
         <button class="btn btn-ghost btn-sm" id="custom-topic-notes-btn">Notes</button>
+        <button class="btn btn-primary btn-sm" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border: none;" id="custom-topic-mindmap-btn">Mind Map</button>
         <button class="btn btn-primary btn-sm" style="background-color: #8b7cf8; color: white;" id="custom-topic-course-btn">Course</button>
       </div>
     </div>
@@ -735,6 +740,7 @@ function renderSubjectPage(subjectName) {
             <button class="btn btn-ghost btn-sm" style="flex: 1 1 45%;" onclick="generateShortAnswer('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Typed</button>
             <button class="btn btn-ghost btn-sm" style="flex: 1 1 45%;" onclick="generateMatchingStandalone('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Match</button>
             <button class="btn btn-ghost btn-sm" style="flex: 1 1 45%;" onclick="generateStudyNotes('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Notes</button>
+            <button class="btn btn-primary btn-sm" style="flex: 1 1 100%; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border: none;" onclick="generateMindMap('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Mind Map</button>
             <button class="btn btn-primary btn-sm" style="flex: 1 1 100%; background-color: #8b7cf8; color: white;" onclick="generateCourse('${realName.replace(/'/g, "\\'")}', '${t.replace(/'/g, "\\'")}')">Full Course</button>
           </div>
         </div>
@@ -775,6 +781,11 @@ function renderSubjectPage(subjectName) {
   document.getElementById('custom-topic-matching-btn').addEventListener('click', () => {
     const val = document.getElementById('custom-topic-input').value.trim();
     if(val) generateMatchingStandalone(realName, val);
+  });
+
+  document.getElementById('custom-topic-mindmap-btn').addEventListener('click', () => {
+    const val = document.getElementById('custom-topic-input').value.trim();
+    if(val) generateMindMap(realName, val);
   });
 }
 
@@ -1755,5 +1766,680 @@ function renderDailyQuiz() {
     });
   });
 }
+
+// ==========================================
+// MIND MAPS FEATURE IMPLEMENTATION
+// ==========================================
+
+let currentMindMapZoom = 1.0;
+const MIN_MINDMAP_ZOOM = 0.5;
+const MAX_MINDMAP_ZOOM = 2.0;
+const ZOOM_STEP = 0.15;
+
+const fallbackMindMaps = {
+  'dna': {
+    "topic": "DNA (Deoxyribonucleic Acid)",
+    "note": "The double-helix molecule carrying genetic instructions for all living organisms.",
+    "children": [
+      {
+        "topic": "Structure",
+        "note": "Double helix composed of nucleotides containing sugar, phosphate, and nitrogenous bases.",
+        "children": [
+          { "topic": "Nucleotides", "note": "Basic building blocks consisting of deoxyribose sugar, phosphate, and a nitrogenous base." },
+          { "topic": "Double Helix", "note": "Spiral structure of two complementary strands winding around a common axis." },
+          { "topic": "Base Pairing", "note": "Specific pairing rules: Adenine pairs with Thymine (A-T), and Cytosine with Guanine (C-G)." }
+        ]
+      },
+      {
+        "topic": "Function",
+        "note": "Stores and transmits genetic information essential for building proteins and replicating cells.",
+        "children": [
+          { "topic": "Protein Synthesis", "note": "DNA directs the creation of proteins via transcription (mRNA) and translation." },
+          { "topic": "Replication", "note": "Semiconservative copying process ensuring new cells receive identical genetic material." },
+          { "topic": "Inheritance", "note": "The transmission of genetic traits and instructions from parents to offspring." }
+        ]
+      },
+      {
+        "topic": "Mutations",
+        "note": "Alterations in the DNA nucleotide sequence which can lead to genetic variation or disease.",
+        "children": [
+          { "topic": "Point Mutation", "note": "A single nucleotide base change, which can alter a specific protein structure." },
+          { "topic": "Frameshift Mutation", "note": "Insertions or deletions shifting the codon reading frame, usually disrupting protein function." },
+          { "topic": "Mutagens", "note": "Physical or chemical agents (such as UV radiation) that increase mutation rates." }
+        ]
+      }
+    ]
+  },
+  'periodic table': {
+    "topic": "Periodic Table",
+    "note": "Tabular arrangement of chemical elements organized by increasing atomic number and periodic properties.",
+    "children": [
+      {
+        "topic": "Organization",
+        "note": "Structured into horizontal rows called Periods and vertical columns called Groups.",
+        "children": [
+          { "topic": "Periods", "note": "Horizontal rows representing the number of electron shells in an element's atoms." },
+          { "topic": "Groups", "note": "Vertical columns of elements sharing similar chemical behaviors and valence electron counts." },
+          { "topic": "Atomic Number", "note": "The number of protons in an element's nucleus, uniquely identifying the element." }
+        ]
+      },
+      {
+        "topic": "Element Classes",
+        "note": "Elements are classified as metals, nonmetals, or metalloids based on physical and chemical traits.",
+        "children": [
+          { "topic": "Metals", "note": "Lustrous, malleable, and ductile elements that conduct heat and electricity excellently." },
+          { "topic": "Nonmetals", "note": "Brittle, poor conductors of heat/electricity, often existing as gases at room temperature." },
+          { "topic": "Metalloids", "note": "Elements possessing intermediate properties, acting as semi-conductors." }
+        ]
+      },
+      {
+        "topic": "Periodic Trends",
+        "note": "Consistent chemical and physical patterns observed across periods and down groups.",
+        "children": [
+          { "topic": "Electronegativity", "note": "Measure of an atom's ability to attract shared electrons within a chemical bond." },
+          { "topic": "Atomic Radius", "note": "The distance from the center of the nucleus to the boundary of the electron cloud." },
+          { "topic": "Ionization Energy", "note": "The minimum energy required to remove the most loosely bound electron from a gaseous atom." }
+        ]
+      }
+    ]
+  },
+  'chemical bonding': {
+    "topic": "Chemical Bonding",
+    "note": "Forces of attraction that hold atoms or ions together to form molecules and stable compounds.",
+    "children": [
+      {
+        "topic": "Ionic Bonding",
+        "note": "Electrostatic attraction between oppositely charged ions formed by electron transfer.",
+        "children": [
+          { "topic": "Electron Transfer", "note": "Metals transfer electrons to nonmetals, forming cations and anions respectively." },
+          { "topic": "Lattice Structure", "note": "A highly ordered three-dimensional ionic crystal structure maximizing attraction." },
+          { "topic": "Properties", "note": "Typically results in high melting points, brittleness, and electrical conductivity when molten." }
+        ]
+      },
+      {
+        "topic": "Covalent Bonding",
+        "note": "Chemical bond formed by the sharing of electron pairs between nonmetal atoms.",
+        "children": [
+          { "topic": "Shared Pairs", "note": "Atoms share valence electrons to achieve a stable octet (noble gas configuration)." },
+          { "topic": "Polar Covalent", "note": "Unequal sharing of electrons due to differences in atomic electronegativities." },
+          { "topic": "Nonpolar Covalent", "note": "Equal sharing of electrons between atoms of similar electronegativities." }
+        ]
+      },
+      {
+        "topic": "Metallic Bonding",
+        "note": "Forces holding metal atoms together via a shared pool of mobile, delocalized electrons.",
+        "children": [
+          { "topic": "Electron Sea", "note": "Valence electrons detach from individual nuclei and flow freely among metal cations." },
+          { "topic": "Malleability", "note": "Allows metal layers to slide over one another without shattering when struck." },
+          { "topic": "Conductivity", "note": "The free-flowing electron sea enables rapid transport of electrical charge and heat." }
+        ]
+      }
+    ]
+  }
+};
+
+function generateLocalFallbackMindMap(subject, topic) {
+  const normTopic = topic.toLowerCase().trim();
+  
+  // Return pre-defined maps if available
+  if (fallbackMindMaps[normTopic]) {
+    return fallbackMindMaps[normTopic];
+  }
+  
+  // Custom fallback generator based on subject
+  const normSubject = (subject || 'General').toLowerCase().trim();
+  
+  let children = [];
+  
+  if (normSubject.includes('math')) {
+    children = [
+      {
+        "topic": `Principles of ${topic}`,
+        "note": `Foundational rules, definitions, and equations governing ${topic}.`,
+        "children": [
+          { "topic": "Key Definitions", "note": `Core mathematical terms and terminology representing ${topic}.` },
+          { "topic": "Governing Formulas", "note": `Fundamental equations and identities used to calculate values in ${topic}.` }
+        ]
+      },
+      {
+        "topic": "Methodologies",
+        "note": `Step-by-step procedures and rules for solving problems related to ${topic}.`,
+        "children": [
+          { "topic": "Solving Steps", "note": `Algorithmic, linear stages of simplification and analysis to find answers.` },
+          { "topic": "Common Pitfalls", "note": `Typical arithmetic, algebraic, or conceptual errors made during exams.` }
+        ]
+      },
+      {
+        "topic": "Applications",
+        "note": `Real-world connections and higher mathematical branches leveraging ${topic}.`,
+        "children": [
+          { "topic": "Real-world Uses", "note": `Practical employment in finance, physics, engineering, computer science, or statistics.` },
+          { "topic": "Advanced Extensions", "note": `How ${topic} interfaces with broader advanced topics and proof methodologies.` }
+        ]
+      }
+    ];
+  } else if (normSubject.includes('eng') || normSubject.includes('media')) {
+    children = [
+      {
+        "topic": "Context & Themes",
+        "note": `Historical settings, authorial intentions, and major themes in ${topic}.`,
+        "children": [
+          { "topic": "Historical Context", "note": `The social, cultural, and political atmosphere surrounding the creation of ${topic}.` },
+          { "topic": "Dominant Themes", "note": `Underlying structural arguments, motifs, and messages delivered by ${topic}.` }
+        ]
+      },
+      {
+        "topic": "Techniques & Style",
+        "note": `Key literary, language, or cinematic devices used to analyze and shape ${topic}.`,
+        "children": [
+          { "topic": "Core Devices", "note": `Literary devices, tropes, film shots, or style elements used to create meaning.` },
+          { "topic": "Structural Tone", "note": `The structural outline, narrative pacing, and aesthetic voice utilized.` }
+        ]
+      },
+      {
+        "topic": "Interpretations",
+        "note": `Varying critical readings and cognitive impacts of ${topic}.`,
+        "children": [
+          { "topic": "Critical Readings", "note": `Theoretical perspectives and academic arguments evaluating the text.` },
+          { "topic": "Audience Impact", "note": `Emotional resonance and ideological reception by contemporary readers/viewers.` }
+        ]
+      }
+    ];
+  } else if (normSubject.includes('hist')) {
+    children = [
+      {
+        "topic": "Origins & Causes",
+        "note": `Political, economic, and social triggers that precipitated ${topic}.`,
+        "children": [
+          { "topic": "Long-term Factors", "note": `Underlying geopolitical tensions, cultural shifts, or trade issues leading to ${topic}.` },
+          { "topic": "Immediate Sparks", "note": `The decisive trigger event or single action that directly initiated the transition.` }
+        ]
+      },
+      {
+        "topic": "Milestones & Figures",
+        "note": `Decisive events, timeline moments, and pivotal historical figures of ${topic}.`,
+        "children": [
+          { "topic": "Key Turning Points", "note": `Critical battles, treaties, or political shifts determining the trajectory of ${topic}.` },
+          { "topic": "Influential Figures", "note": `Key leaders, activists, or generals who made central decisions.` }
+        ]
+      },
+      {
+        "topic": "Legacy & Aftermath",
+        "note": `The immediate consequences and long-term historical impact of ${topic}.`,
+        "children": [
+          { "topic": "Short-term Results", "note": `Immediate aftermath, treaties, casualties, or institutional changes.` },
+          { "topic": "Historical Impact", "note": `How ${topic} permanently altered global relations, society, or modern norms.` }
+        ]
+      }
+    ];
+  } else if (normSubject.includes('sys') || normSubject.includes('tech') || normSubject.includes('wiring') || normSubject.includes('coding')) {
+    children = [
+      {
+        "topic": "System Architecture",
+        "note": `Hardware components, data elements, and setup configurations of ${topic}.`,
+        "children": [
+          { "topic": "Components", "note": `The physical parts, sensors, microcontrollers, or wiring modules involved.` },
+          { "topic": "Interface Rules", "note": `Standard protocols, input/output constraints, and signals implementing ${topic}.` }
+        ]
+      },
+      {
+        "topic": "Control & Code Logic",
+        "note": `Functional loops, software commands, and physical signal pathways of ${topic}.`,
+        "children": [
+          { "topic": "Signal Flow", "note": `How electrical current or packet data traverses the wiring/network.` },
+          { "topic": "Code Structures", "note": `The logical algorithms, programming structures, or state machine variables.` }
+        ]
+      },
+      {
+        "topic": "Diagnostics & Safety",
+        "note": `Standard troubleshooting rules, testing methods, and safety protocols.`,
+        "children": [
+          { "topic": "Debugging Process", "note": `Techniques to trace issues, isolate bugs, measure voltages, or read error logs.` },
+          { "topic": "Safety Standards", "note": `Crucial measures to avoid component failure, electrostatic discharge, or short circuits.` }
+        ]
+      }
+    ];
+  } else {
+    // Default Science/General layout
+    children = [
+      {
+        "topic": "Core Principles",
+        "note": `Fundamental concepts, definitions, and rules governing ${topic}.`,
+        "children": [
+          { "topic": "Terminology", "note": `Key concepts and academic vocabulary essential to discuss ${topic}.` },
+          { "topic": "Scientific Basis", "note": `The physical laws, biological codes, or chemical axioms establishing ${topic}.` }
+        ]
+      },
+      {
+        "topic": "Mechanisms & Process",
+        "note": `Internal interactions, pathways, and procedural steps defining ${topic}.`,
+        "children": [
+          { "topic": "Primary Dynamics", "note": `How the different elements of ${topic} interact with one another.` },
+          { "topic": "Key Stages", "note": `Step-by-step phases of the process or operational progression.` }
+        ]
+      },
+      {
+        "topic": "Implications & Uses",
+        "note": `Why ${topic} matters and where it is observed or applied.`,
+        "children": [
+          { "topic": "Practical Uses", "note": `Industrial, pharmaceutical, environmental, or commercial applications.` },
+          { "topic": "Broader Relevance", "note": `How ${topic} impacts larger systemic structures or ecosystems.` }
+        ]
+      }
+    ];
+  }
+  
+  return {
+    "topic": topic,
+    "note": `A comprehensive study mind map organizing key aspects of ${topic} within ${subject}.`,
+    "children": children
+  };
+}
+
+function extractJSON(str) {
+  if (!str) return null;
+  const start = str.indexOf('{');
+  const end = str.lastIndexOf('}');
+  if (start !== -1 && end !== -1 && end > start) {
+    const rawJSON = str.substring(start, end + 1);
+    try {
+      return JSON.parse(rawJSON);
+    } catch (e) {
+      console.warn("JSON.parse failed on extracted substring, attempting minor cleanups...", e);
+      // Clean up common issues:
+      // - Trailing commas before closing braces/brackets
+      let cleaned = rawJSON
+        .replace(/,\s*([}\]])/g, '$1') // Remove trailing commas before } or ]
+        .replace(/\\n/g, ' ')          // Replace line breaks inside strings
+        .replace(/\\"/g, '"');         // Fix double escaped quotes
+      try {
+        return JSON.parse(cleaned);
+      } catch (innerErr) {
+        console.error("JSON cleanup parse failed:", innerErr);
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+function updateMindMapZoom(level) {
+  currentMindMapZoom = Math.max(MIN_MINDMAP_ZOOM, Math.min(MAX_MINDMAP_ZOOM, level));
+  
+  const zoomWrapper = document.getElementById('mindmap-zoom-wrapper');
+  if (zoomWrapper) {
+    zoomWrapper.style.transform = `scale(${currentMindMapZoom})`;
+  }
+  
+  const zoomLabel = document.getElementById('mindmap-zoom-label');
+  if (zoomLabel) {
+    zoomLabel.textContent = `${Math.round(currentMindMapZoom * 100)}%`;
+  }
+  
+  // Re-draw connectors to fit scaled node rects
+  drawMindMapConnectors();
+}
+
+function setupMindMapDragToPan() {
+  const container = document.getElementById('mindmap-canvas-container');
+  if (!container) return;
+  
+  let isDown = false;
+  let startX;
+  let startY;
+  let scrollLeft;
+  let scrollTop;
+  
+  // Mouse Down
+  container.addEventListener('mousedown', (e) => {
+    // Only grab when clicking the container background, not nodes or controls
+    if (e.target.closest('.mindmap-node') || e.target.closest('#mindmap-controls')) return;
+    
+    isDown = true;
+    container.classList.add('grabbing');
+    startX = e.pageX - container.offsetLeft;
+    startY = e.pageY - container.offsetTop;
+    scrollLeft = container.scrollLeft;
+    scrollTop = container.scrollTop;
+  });
+  
+  // Mouse Leave
+  container.addEventListener('mouseleave', () => {
+    isDown = false;
+    container.classList.remove('grabbing');
+  });
+  
+  // Mouse Up
+  container.addEventListener('mouseup', () => {
+    isDown = false;
+    container.classList.remove('grabbing');
+  });
+  
+  // Mouse Move
+  container.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - container.offsetLeft;
+    const y = e.pageY - container.offsetTop;
+    const walkX = (x - startX) * 1.5; // Scroll speed factor
+    const walkY = (y - startY) * 1.5;
+    container.scrollLeft = scrollLeft - walkX;
+    container.scrollTop = scrollTop - walkY;
+  });
+}
+
+function setupMindMapZoomControls() {
+  const zoomInBtn = document.getElementById('mindmap-zoom-in');
+  const zoomOutBtn = document.getElementById('mindmap-zoom-out');
+  const zoomResetBtn = document.getElementById('mindmap-zoom-reset');
+  
+  if (zoomInBtn) {
+    zoomInBtn.onclick = (e) => {
+      e.stopPropagation();
+      updateMindMapZoom(currentMindMapZoom + ZOOM_STEP);
+    };
+  }
+  
+  if (zoomOutBtn) {
+    zoomOutBtn.onclick = (e) => {
+      e.stopPropagation();
+      updateMindMapZoom(currentMindMapZoom - ZOOM_STEP);
+    };
+  }
+  
+  if (zoomResetBtn) {
+    zoomResetBtn.onclick = (e) => {
+      e.stopPropagation();
+      updateMindMapZoom(1.0);
+    };
+  }
+}
+
+window.generateMindMap = async (subject, topic) => {
+  const modal = document.getElementById('mindmap-modal');
+  const loading = document.getElementById('mindmap-loading');
+  const canvas = document.getElementById('mindmap-canvas');
+  const inspectorEmpty = document.getElementById('mindmap-inspector-empty');
+  const inspectorContent = document.getElementById('mindmap-inspector-content');
+  
+  document.getElementById('mindmap-modal-title').textContent = `Mind Map: ${topic}`;
+  modal.classList.remove('hidden');
+  loading.classList.remove('hidden');
+  canvas.innerHTML = '';
+  inspectorContent.classList.add('hidden');
+  inspectorEmpty.classList.remove('hidden');
+
+  // Reset zoom scale to neutral
+  currentMindMapZoom = 1.0;
+  updateMindMapZoom(1.0);
+  
+  // Establish interactive event bindings
+  setupMindMapDragToPan();
+  setupMindMapZoomControls();
+
+  const prompt = `Create a structured mind map for the topic "${topic}" in the subject "${subject}".
+The mind map should have a central root node (the main topic) and branch into 3 to 5 subtopics.
+Each subtopic should have 2 to 4 detailed sub-points/facts or child concepts.
+For each subtopic and sub-point, you should provide:
+1. "topic" (short name, 1-3 words)
+2. "note" (a clean, concise explanation/fact, 1 sentence, up to 15 words)
+
+Return ONLY a JSON object representing the hierarchy, with the keys:
+- "topic" (string, the root topic)
+- "note" (string, the main definition or overview)
+- "children" (array of subtopic objects, each having "topic", "note", and optional "children" array of sub-point/fact objects)
+
+Ensure the return is strictly a raw valid JSON object, without any markdown formatting, html, or \`\`\`json blocks.
+Example format:
+{
+  "topic": "Photosynthesis",
+  "note": "Process where plants convert light energy into chemical energy",
+  "children": [
+    {
+      "topic": "Light Reactions",
+      "note": "Occurs in thylakoid membranes, produces ATP and NADPH",
+      "children": [
+        { "topic": "Chlorophyll", "note": "Pigment absorbing light energy" },
+        { "topic": "Photolysis", "note": "Water molecules split into hydrogen and oxygen" }
+      ]
+    }
+  ]
+}`;
+
+  try {
+    let data = null;
+    try {
+      const result = await callGemini(prompt);
+      data = extractJSON(result);
+      if (!data) {
+        throw new Error("JSON extraction returned null.");
+      }
+    } catch (e) {
+      console.warn("API/JSON parse error: Falling back to local high-fidelity generator.", e);
+      data = generateLocalFallbackMindMap(subject, topic);
+    }
+    
+    // Build HTML string
+    let html = `
+      <div class="mindmap-root-wrapper">
+        <!-- Root Node -->
+        <div class="mindmap-node root" data-node-id="node-root" data-type="Core Topic" data-title="${escapeHTML(data.topic)}" data-note="${escapeHTML(data.note)}">
+          <h4>${escapeHTML(data.topic)}</h4>
+          <p>${escapeHTML(data.note)}</p>
+        </div>
+        
+        <!-- Branches -->
+        <div class="mindmap-branches">
+    `;
+    
+    if (data.children && data.children.length > 0) {
+      data.children.forEach((sub, subIdx) => {
+        const subId = `node-sub-${subIdx}`;
+        html += `
+          <div class="mindmap-branch">
+            <!-- Subtopic Node -->
+            <div class="mindmap-node subtopic" data-node-id="${subId}" data-parent-id="node-root" data-type="Subtopic" data-title="${escapeHTML(sub.topic)}" data-note="${escapeHTML(sub.note)}">
+              <h4>${escapeHTML(sub.topic)}</h4>
+              <p>${escapeHTML(sub.note)}</p>
+            </div>
+        `;
+        
+        if (sub.children && sub.children.length > 0) {
+          html += `<div class="mindmap-leafs">`;
+          sub.children.forEach((leaf, leafIdx) => {
+            const leafId = `node-leaf-${subIdx}-${leafIdx}`;
+            html += `
+              <!-- Leaf Node -->
+              <div class="mindmap-node leaf" data-node-id="${leafId}" data-parent-id="${subId}" data-type="Key Concept" data-title="${escapeHTML(leaf.topic)}" data-note="${escapeHTML(leaf.note)}">
+                <h4>${escapeHTML(leaf.topic)}</h4>
+                <p>${escapeHTML(leaf.note)}</p>
+              </div>
+            `;
+          });
+          html += `</div>`; // end leafs
+        }
+        
+        html += `</div>`; // end branch
+      });
+    }
+    
+    html += `
+        </div> <!-- end branches -->
+      </div> <!-- end root-wrapper -->
+    `;
+    
+    canvas.innerHTML = html;
+    loading.classList.add('hidden');
+    
+    setupMindMapInteractions(subject, topic);
+    
+    // Draw SVG curves
+    setTimeout(() => {
+      drawMindMapConnectors();
+    }, 150);
+    
+  } catch (e) {
+    console.error("Failed to parse or fetch mind map", e);
+    canvas.innerHTML = `
+      <div style="margin: 40px auto; text-align: center; max-width: 400px; padding: 24px; background: var(--bg3); border-radius: var(--radius); border: 1px solid var(--border);">
+        <p style="color: var(--red); font-weight: 600; margin-bottom: 12px;">Failed to generate mind map.</p>
+        <p style="font-size: 13px; color: var(--text2); margin-bottom: 20px;">The AI model did not return a valid hierarchical layout. Please try again.</p>
+        <button class="btn btn-primary btn-sm" onclick="generateMindMap('${subject.replace(/'/g, "\\'")}', '${topic.replace(/'/g, "\\'")}')">Retry Generation</button>
+      </div>
+    `;
+    loading.classList.add('hidden');
+  }
+};
+
+window.closeMindMap = () => {
+  document.getElementById('mindmap-modal').classList.add('hidden');
+};
+
+document.getElementById('mindmap-modal-close').addEventListener('click', () => {
+  closeMindMap();
+});
+
+function escapeHTML(str) {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function setupMindMapInteractions(subject, mainTopic) {
+  const canvas = document.getElementById('mindmap-canvas');
+  const nodes = canvas.querySelectorAll('.mindmap-node');
+  const inspectorEmpty = document.getElementById('mindmap-inspector-empty');
+  const inspectorContent = document.getElementById('mindmap-inspector-content');
+  
+  const inspType = document.getElementById('inspector-node-type');
+  const inspTitle = document.getElementById('inspector-node-title');
+  const inspNote = document.getElementById('inspector-node-note');
+  const inspExplainBtn = document.getElementById('inspector-explain-btn');
+  
+  nodes.forEach(node => {
+    node.addEventListener('click', () => {
+      // Highlight selected node
+      nodes.forEach(n => n.classList.remove('active'));
+      node.classList.add('active');
+      
+      const type = node.getAttribute('data-type');
+      const title = node.getAttribute('data-title');
+      const note = node.getAttribute('data-note');
+      
+      inspType.textContent = type;
+      inspTitle.textContent = title;
+      inspNote.innerHTML = note;
+      
+      // Update KaTeX rendering in inspector card in case it has mathematical equations!
+      if (window.renderMath) {
+        window.renderMath(inspNote);
+      }
+      
+      // Configure inspector explain button
+      inspExplainBtn.onclick = () => {
+        closeMindMap();
+        
+        // Navigate to AI Chat
+        const chatBtn = document.querySelector('.nav-btn[data-page="ai-chat"]');
+        if (chatBtn) {
+          chatBtn.click();
+        } else {
+          // Fallback manual navigation
+          sidebarNavs.forEach(n => n.classList.remove('active'));
+          const chatNav = document.getElementById('nav-ai-chat') || document.querySelector('[data-page="ai-chat"]');
+          if (chatNav) chatNav.classList.add('active');
+          pages.forEach(p => p.classList.remove('active'));
+          document.getElementById('page-ai-chat').classList.add('active');
+        }
+        
+        // Set Chat Subject select context if present
+        const chatSubjectSelect = document.getElementById('chat-subject-select');
+        if (chatSubjectSelect) {
+          const opt = Array.from(chatSubjectSelect.options).find(o => o.value.toLowerCase() === subject.toLowerCase());
+          if (opt) chatSubjectSelect.value = opt.value;
+        }
+        
+        // Trigger AI Tutor Prompt
+        const chatInput = document.getElementById('chat-input');
+        if (chatInput) {
+          chatInput.value = `Hi! Can you explain the concept of "${title}" from the topic "${mainTopic}" in my "${subject}" class? I'd like a clear breakdown with examples.`;
+          const sendBtn = document.getElementById('chat-send-btn');
+          if (sendBtn) sendBtn.click();
+        }
+      };
+      
+      inspectorEmpty.classList.add('hidden');
+      inspectorContent.classList.remove('hidden');
+    });
+  });
+}
+
+function drawMindMapConnectors() {
+  const canvas = document.getElementById('mindmap-canvas');
+  if (!canvas || canvas.offsetParent === null) return;
+  
+  let svg = canvas.querySelector('svg.mindmap-svg');
+  if (!svg) {
+    svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'mindmap-svg');
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.width = '100%';
+    svg.style.height = '100%';
+    svg.style.pointerEvents = 'none';
+    svg.style.zIndex = '1';
+    canvas.appendChild(svg);
+  }
+  
+  svg.innerHTML = '';
+  const canvasRect = canvas.getBoundingClientRect();
+  const nodes = canvas.querySelectorAll('.mindmap-node');
+  
+  nodes.forEach(node => {
+    const parentId = node.getAttribute('data-parent-id');
+    if (!parentId) return;
+    
+    const parentNode = canvas.querySelector(`[data-node-id="${parentId}"]`);
+    if (!parentNode) return;
+    
+    const rectA = parentNode.getBoundingClientRect();
+    const rectB = node.getBoundingClientRect();
+    
+    // From parent right edge to child left edge
+    const x1 = (rectA.right - canvasRect.left) / currentMindMapZoom;
+    const y1 = (rectA.top + rectA.height / 2 - canvasRect.top) / currentMindMapZoom;
+    
+    const x2 = (rectB.left - canvasRect.left) / currentMindMapZoom;
+    const y2 = (rectB.top + rectB.height / 2 - canvasRect.top) / currentMindMapZoom;
+    
+    const deltaX = x2 - x1;
+    const cp1x = x1 + deltaX * 0.45;
+    const cp1y = y1;
+    const cp2x = x1 + deltaX * 0.55;
+    const cp2y = y2;
+    
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`);
+    path.setAttribute('stroke', '#8b7cf8');
+    path.setAttribute('stroke-width', '2');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('opacity', '0.65');
+    path.setAttribute('stroke-dasharray', '5, 5');
+    path.setAttribute('class', 'mindmap-path-animate');
+    svg.appendChild(path);
+  });
+}
+
+// Redraw connections on resize so they align perfectly
+window.addEventListener('resize', () => {
+  if (document.getElementById('mindmap-modal') && !document.getElementById('mindmap-modal').classList.contains('hidden')) {
+    drawMindMapConnectors();
+  }
+});
 
 init();
